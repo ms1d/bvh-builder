@@ -1,0 +1,43 @@
+{
+	"version": 3,
+	"configurePresets": [
+		{
+			"name": "dev",
+			"displayName": "Development",
+			"generator": "Ninja",
+			"binaryDir": "build/dev",
+			"cacheVariables": {
+				"CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+				"BUILD_TESTS": "OFF",
+				"CMAKE_CXX_FLAGS": "-g -Wall -Wextra -Wpedantic -Og -fuse-ld=gold",
+				"CMAKE_UNITY_BUILD": "OFF"
+			}
+		},
+
+		{
+			"name": "rel",
+			"displayName": "Release",
+			"generator": "Ninja",
+			"binaryDir": "build/rel",
+			"cacheVariables": {
+				"CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+				"CMAKE_BUILD_TYPE": "Release",
+				"BUILD_TESTS": "OFF",
+				"CMAKE_CXX_FLAGS": "-O3 -DNDEBUG -flto=auto -fuse-ld=gold",
+				"CMAKE_UNITY_BUILD": "ON"
+			}
+		}
+	],
+
+	"buildPresets": [
+		{
+			"name": "dev",
+			"configurePreset": "dev"
+		},
+		{
+			"name": "rel",
+			"configurePreset": "rel"
+		}
+	]
+}
+
