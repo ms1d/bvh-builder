@@ -120,6 +120,17 @@ void output_bvh_node(bvh_node *curr_node, uint32_t *root_tris, char *output_buff
 
 
 
+void free_bvh_children(bvh_node *node) {
+	if (node == nullptr) return;
+	free_bvh_children(node->left);
+	delete node->left;
+
+	free_bvh_children(node->right);
+	delete node->right;
+}
+
+
+
 void build_bvh(const std::filesystem::path &file_path, std::atomic<uint> &curr_thread_count) {
 	auto start = std::chrono::high_resolution_clock::now();
 	curr_thread_count++;
@@ -157,7 +168,8 @@ void build_bvh(const std::filesystem::path &file_path, std::atomic<uint> &curr_t
 	delete[] verts;
 	delete[] tris;
 
-	// TODO - FREE NODES!!!!!
+	free_bvh_children(&root);
+
 	auto end = std::chrono::high_resolution_clock::now();
 
 	std::cout << "Time taken in us: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "\n";
