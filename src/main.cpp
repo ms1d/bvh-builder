@@ -6,11 +6,13 @@
 #include <thread>
 #include <unistd.h>
 #include "build_bvh.hpp"
+#include "thread_pool.hpp"
 
 
 
-constexpr uint max_thread_count = 5;
-constexpr uint sleep_period = 5;
+#define MAX_WORKERS 5
+#define THREADS_PER_WORKER 32
+#define SLEEP_PERIOD 5
 
 
 
@@ -37,17 +39,19 @@ int main(int argc, char *argv[]) {
 
 	std::atomic<uint> curr_thread_count = 0;
 
+	thread_pool pool(MAX_WORKERS * THREADS_PER_WORKER, build_bvh_node);
+
 	while (true) {
 		for (const auto &entry : std::filesystem::directory_iterator(path)) {
-			if (entry.is_regular_file() && entry.path().extension() == ".mesh" && curr_thread_count.load() < max_thread_count) {
+			if (entry.is_regular_file() && entry.path().extension() == ".mesh" && curr_thread_count.load() < MAX_WORKERS) {
 				const auto &dst = std::filesystem::path(path) / "baking" / entry.path().filename();
 				std::filesystem::copy_file(entry.path(), dst);
 				std::filesystem::remove(entry.path());
-				std::thread(build_bvh, std::filesystem::absolute(dst), std::ref(curr_thread_count)).detach();
+				std::thread(build_bvh, std::filesystem::absolute(dst), std::ref(curr_thread_count), std::ref(pool)).detach();
 			}
 		}
 
-		sleep(sleep_period);
+		sleep(SLEEP_PERIOD);
 	}
 
 	return 1;
