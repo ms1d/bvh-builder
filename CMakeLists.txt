@@ -5,3 +5,5 @@ add_executable(bvh-builder ${PATH_SRC})
 
 target_link_libraries(bvh-builder PRIVATE veclib)
 target_include_directories(bvh-builder PRIVATE include)
+
+add_subdirectory(lib)
