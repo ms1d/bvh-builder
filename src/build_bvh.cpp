@@ -32,9 +32,9 @@ void find_min_max_verts(vec<3> *verts, uint32_t *tris, uint32_t len, vec<3> &out
 
 
 
-void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> &bvh_count) {
+void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> &nodes_len) {
 	// If node has few tris, do not recurse; return to caller
-	if (node->tris_len <= MAX_TRIS) { bvh_count++; return; }
+	if (node->tris_len <= MAX_TRIS) { nodes_len++; return; }
 
 	// 1 - Split BVH by longest axis
 	vec<3> offset(node->max - node->min);
@@ -80,14 +80,14 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> &bvh_co
 
 	// 3 - Recurse with 2 new threads, await results
 	std::thread
-		left_thread(build_bvh_node, left, verts, std::ref(bvh_count)),
-		right_thread(build_bvh_node, right, verts, std::ref(bvh_count));
+		left_thread(build_bvh_node, left, verts, std::ref(nodes_len)),
+		right_thread(build_bvh_node, right, verts, std::ref(nodes_len));
 	left_thread.join(); right_thread.join();
 
 	// This node has children so set its tris to nullptr.
 	// Ignore tris_len in this case
 	node->tris = nullptr;
-	bvh_count++;
+	nodes_len++;
 }
 
 
@@ -141,14 +141,14 @@ void build_bvh(const std::filesystem::path &file_path, std::atomic<uint> &curr_t
 	parse_mesh(file_path, tris, tris_len, verts, verts_len, max, min);
 	
 	bvh_node root; root.tris = tris; root.tris_len = tris_len; root.max = max; root.min = min;
-	std::atomic<uint16_t> bvh_count = 0;
-	build_bvh_node(&root, verts, bvh_count);
+	std::atomic<uint16_t> nodes_len = 0;
+	build_bvh_node(&root, verts, nodes_len);
 
 	const auto &dst = file_path.parent_path().parent_path() / "baked" / file_path.filename();
 
 	char *output_buffer = new char[
-		+ sizeof(bvh_count)
-		+ bvh_count * sizeof(bvh_node_serialised) // bvh_nodes
+		+ sizeof(nodes_len)
+		+ nodes_len * sizeof(bvh_node_serialised) // bvh_nodes
 	];
 
 	std::filesystem::copy(file_path, dst);
@@ -156,13 +156,13 @@ void build_bvh(const std::filesystem::path &file_path, std::atomic<uint> &curr_t
 
 	std::ofstream output(dst, std::ios::binary | std::ios::app);
 
-	memcpy(output_buffer, &bvh_count, sizeof(bvh_count));
+	memcpy(output_buffer, &nodes_len, sizeof(nodes_len));
 	std::cout << "starting write\n";
 	std::atomic<uint16_t> next_pos = 1;
-	output_bvh_node(&root, root.tris, output_buffer + sizeof(bvh_count), next_pos, 0);
+	output_bvh_node(&root, root.tris, output_buffer + sizeof(nodes_len), next_pos, 0);
 	std::cout << "done write\n";
 
-	output.write(output_buffer + sizeof(bvh_count), bvh_count * sizeof(bvh_node_serialised));
+	output.write(output_buffer + sizeof(nodes_len), nodes_len * sizeof(bvh_node_serialised));
 	output.close();
 
 	delete[] verts;
