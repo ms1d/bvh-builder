@@ -1,0 +1,6 @@
+[submodule "lib/vec"]
+	path = lib/vec
+	url = git@github.com:ms1d/vec
+[submodule "lib/common"]
+	path = lib/common
+	url = git@github.com:ms1d/common
