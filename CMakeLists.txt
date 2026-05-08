@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.26)
 
+project(bvh-builder)
+
 file(GLOB PATH_SRC src/*.cpp)
 add_executable(bvh-builder ${PATH_SRC})
 
