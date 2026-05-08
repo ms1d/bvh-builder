@@ -3,7 +3,7 @@
 A concurrent BVH builder for path tracing applications
 in c++ to run on little-endian machines.
 
-## INPUT FORMAT
+## Input Format
 
 - `uint32_t verts_len` (number of elements in `verts`)
 
@@ -13,7 +13,7 @@ in c++ to run on little-endian machines.
 
 - `uint32_t *tris` (each tri is 3 indices into `verts`)
 
-## OUTPUT FORMAT
+## Output Format
 
 - `uint32_t verts_len` (number of elements in `verts`)
 
