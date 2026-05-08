@@ -39,7 +39,8 @@ int main(int argc, char *argv[]) {
 
 	std::atomic<uint> curr_thread_count = 0;
 
-	thread_pool pool(MAX_WORKERS * THREADS_PER_WORKER, build_bvh_node);
+	thread_pool<bvh_node*, vec<3>*, std::atomic<uint16_t>&> build_bvh_node_pool (MAX_WORKERS * THREADS_PER_WORKER, build_bvh_node);
+	thread_pool<bvh_node*, uint32_t*, char*, std::atomic<uint16_t>&, uint16_t> output_bvh_node_pool(MAX_WORKERS * THREADS_PER_WORKER, output_bvh_node);
 
 	while (true) {
 		for (const auto &entry : std::filesystem::directory_iterator(path)) {
@@ -47,7 +48,7 @@ int main(int argc, char *argv[]) {
 				const auto &dst = std::filesystem::path(path) / "baking" / entry.path().filename();
 				std::filesystem::copy_file(entry.path(), dst);
 				std::filesystem::remove(entry.path());
-				std::thread(build_bvh, std::filesystem::absolute(dst), std::ref(curr_thread_count), std::ref(pool)).detach();
+				std::thread(build_bvh, std::filesystem::absolute(dst), std::ref(curr_thread_count), &build_bvh_node_pool, &output_bvh_node_pool).detach();
 			}
 		}
 
