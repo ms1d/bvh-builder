@@ -79,15 +79,10 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> &nodes_
 	left->tris = node->tris; left->tris_len = node->tris_len - right->tris_len;
 
 	// 3 - Recurse with 2 new threads, await results
-	//std::thread
-	//	left_thread(build_bvh_node, left, verts, std::ref(nodes_len)),
-	//	right_thread(build_bvh_node, right, verts, std::ref(nodes_len));
-	//left_thread.join(); right_thread.join();
 
 	std::condition_variable cv; std::atomic<bool> has_finished = false;
 	std::mutex cv_mtx; std::unique_lock<std::mutex> cv_lock(cv_mtx);
 	if (build_bvh_node_pool.try_emplace_task(cv, has_finished, cv_mtx, left, verts, nodes_len)) {
-	//if (false) {
 		build_bvh_node(right, verts, std::ref(nodes_len));
 		cv.wait(cv_lock, [&]() {
             return has_finished.load();
@@ -104,7 +99,6 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> &nodes_
 	// Ignore tris_len in this case
 	node->tris = nullptr;
 	nodes_len.fetch_add(1);
-
 }
 
 
@@ -129,7 +123,6 @@ void output_bvh_node(bvh_node *curr_node, uint32_t *root_tris, char *output_buff
 		std::mutex cv_mtx; std::unique_lock<std::mutex> cv_lock(cv_mtx);
 
 		if (output_bvh_node_pool.try_emplace_task(cv, has_finished, cv_mtx, curr_node->left, root_tris, output_buffer, next_pos, left_index)) {
-		//if (false) {
 			output_bvh_node(curr_node->right, root_tris, output_buffer, next_pos, right_index);
 			cv.wait(cv_lock, [&]() {
 				return has_finished.load();
@@ -166,9 +159,7 @@ void build_bvh(const std::filesystem::path &file_path, std::atomic<uint> &curr_t
 	bvh_node root; root.tris = tris; root.tris_len = tris_len; root.max = max; root.min = min;
 	std::atomic<uint16_t> nodes_len = 0;
 
-	std::cout << "bvh start\n";
 	build_bvh_node(&root, verts, nodes_len);
-	std::cout << "bvh end\n";
 	auto end = std::chrono::high_resolution_clock::now();
 
 	std::cout << "Time taken in us: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "\n";
@@ -187,9 +178,7 @@ void build_bvh(const std::filesystem::path &file_path, std::atomic<uint> &curr_t
 
 	memcpy(output_buffer, &nodes_len, sizeof(nodes_len));
 	std::atomic<uint16_t> next_pos = 1;
-	std::cout << "output start\n";
 	output_bvh_node(&root, tris, output_buffer + sizeof(nodes_len), next_pos, 0);
-	std::cout << "output end\n";
 
 	output.write(output_buffer + sizeof(nodes_len), nodes_len * sizeof(bvh_node_serialised));
 	output.close();
