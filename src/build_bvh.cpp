@@ -4,27 +4,20 @@
 #include <cstring>
 #include <filesystem>
 #include <atomic>
-#include <functional>
 #include <iostream>
 #include <mutex>
-#include <thread>
 #include <fstream>
 #include <unistd.h>
 #include "thread_pool.hpp"
 #include "vec.cuh"
 #include "parse_mesh.hpp"
 #include "structs.hpp"
+#include "build_bvh.hpp"
 
 
 
 // Max number of elements in tris per child INCLUSIVE
 #define MAX_TRIS 150
-
-
-
-thread_local thread_pool<bvh_node*, vec<3>*, std::atomic<uint16_t>&> *build_bvh_node_pool = nullptr;
-thread_local thread_pool<bvh_node*, uint32_t*, char*, std::atomic<uint16_t>&, uint16_t> *output_bvh_node_pool = nullptr;
-
 
 
 void find_min_max_verts(vec<3> *verts, uint32_t *tris, uint32_t len, vec<3> &out_min, vec<3> &out_max) {
@@ -41,8 +34,9 @@ void find_min_max_verts(vec<3> *verts, uint32_t *tris, uint32_t len, vec<3> &out
 
 
 void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> &nodes_len) {
+
 	// If node has few tris, do not recurse; return to caller
-	if (node->tris_len <= MAX_TRIS) { nodes_len++; return; }
+	if (node->tris_len <= MAX_TRIS) { nodes_len.fetch_add(1); return; }
 
 	// 1 - Split BVH by longest axis
 	vec<3> offset(node->max - node->min);
@@ -69,12 +63,10 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> &nodes_
 		bool left_correct = left_tri_verts[0][longest_axis] > offset[longest_axis] + node->min.data[longest_axis],
 			 right_correct = right_tri_verts[0][longest_axis] <= node->min.data[longest_axis] + offset[longest_axis];
 
-
 		if (!left_correct && !right_correct) {
 			std::swap(*front, *(back-2));
 			std::swap(*(front+1), *(back-1));
 			std::swap(*(front+2), *back);
-
 		}
 		else {
 			left_correct ? front += 3 : 0;
@@ -92,22 +84,27 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> &nodes_
 	//	right_thread(build_bvh_node, right, verts, std::ref(nodes_len));
 	//left_thread.join(); right_thread.join();
 
-	bvh_node *children[] = { left, right };
-	for (auto &child : children) {		
-		std::condition_variable cv; std::atomic<bool> has_finished = false;
-		std::mutex cv_mtx; std::unique_lock<std::mutex> cv_lock(cv_mtx);
-
-		build_bvh_node_pool->emplace_task(cv, has_finished, child, verts, nodes_len);
-
+	std::condition_variable cv; std::atomic<bool> has_finished = false;
+	std::mutex cv_mtx; std::unique_lock<std::mutex> cv_lock(cv_mtx);
+	if (build_bvh_node_pool.try_emplace_task(cv, has_finished, cv_mtx, left, verts, nodes_len)) {
+	//if (false) {
+		build_bvh_node(right, verts, std::ref(nodes_len));
 		cv.wait(cv_lock, [&]() {
-			return has_finished.load();
-		});
+            return has_finished.load();
+        });
+    }
+	else {
+		build_bvh_node(left, verts, std::ref(nodes_len));
+		build_bvh_node(right, verts, std::ref(nodes_len));
 	}
+	
+	
 
 	// This node has children so set its tris to nullptr.
 	// Ignore tris_len in this case
 	node->tris = nullptr;
-	nodes_len++;
+	nodes_len.fetch_add(1);
+
 }
 
 
@@ -115,36 +112,32 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> &nodes_
 void output_bvh_node(bvh_node *curr_node, uint32_t *root_tris, char *output_buffer, std::atomic<uint16_t> &next_pos, uint16_t curr_bvh_pos) {
 	if (curr_node == nullptr) return;
 
-	uint16_t left_index = next_pos++, right_index = next_pos++;
-	//std::thread left_thread(output_bvh_node, curr_node->left, root_tris, output_buffer, std::ref(next_pos), left_index);
-	//std::thread right_thread(output_bvh_node, curr_node->right, root_tris, output_buffer, std::ref(next_pos), right_index);
-	//left_thread.join(); right_thread.join();
-	
-	bvh_node *children[] = { curr_node->left, curr_node->right };
-    for (auto &child : children) {
-        std::condition_variable cv; std::atomic<bool> has_finished = false;
-        std::mutex cv_mtx; std::unique_lock<std::mutex> cv_lock(cv_mtx);
-
-		output_bvh_node_pool->emplace_task(cv, has_finished, child, root_tris, output_buffer, next_pos, curr_bvh_pos);
-
-		cv.wait(cv_lock, [&]() {
-			return has_finished.load();
-		});
-	}
-
-	//output_bvh_node(curr_node->left, root_tris, output_buffer, next_pos, left_index);
-	//output_bvh_node(curr_node->right, root_tris, output_buffer, next_pos, right_index);
 	bvh_node_serialised curr_node_out;
-	
 	curr_node_out.max = curr_node->max; curr_node_out.min = curr_node->min;
 
 	if (curr_node->tris != nullptr) { 
 		curr_node_out.tris_i = curr_node->tris - root_tris;
 		curr_node_out.tris_len = curr_node->tris_len;
+		curr_node_out.left_i = curr_node_out.right_i = 0;
 	}
 	else {
+		uint16_t left_index = next_pos++, right_index = next_pos++;
 		curr_node_out.left_i = left_index;
 		curr_node_out.right_i = right_index;
+
+		std::condition_variable cv; std::atomic<bool> has_finished = false;
+		std::mutex cv_mtx; std::unique_lock<std::mutex> cv_lock(cv_mtx);
+
+		if (output_bvh_node_pool.try_emplace_task(cv, has_finished, cv_mtx, curr_node->left, root_tris, output_buffer, next_pos, left_index)) {
+		//if (false) {
+			output_bvh_node(curr_node->right, root_tris, output_buffer, next_pos, right_index);
+			cv.wait(cv_lock, [&]() {
+				return has_finished.load();
+			});
+		} else {
+			output_bvh_node(curr_node->left, root_tris, output_buffer, next_pos, left_index);
+			output_bvh_node(curr_node->right, root_tris, output_buffer, next_pos, right_index);
+		}
 	}
 
 	memcpy(output_buffer + curr_bvh_pos * sizeof(bvh_node_serialised), &curr_node_out, sizeof(bvh_node_serialised));
@@ -161,24 +154,24 @@ void free_bvh_children(bvh_node *node) {
 	delete node->right;
 }
 
-void build_bvh(const std::filesystem::path &file_path, std::atomic<uint> &curr_thread_count,
-		thread_pool<bvh_node*, vec<3>*, std::atomic<uint16_t>&> *build_bvh_node_pool_in,
-		thread_pool<bvh_node*, uint32_t*, char*, std::atomic<uint16_t>&, uint16_t> *output_bvh_node_pool_in) {
+void build_bvh(const std::filesystem::path &file_path, std::atomic<uint> &curr_thread_count) {
 	auto start = std::chrono::high_resolution_clock::now();
 	curr_thread_count++;
-
-	if (build_bvh_node_pool_in == nullptr || output_bvh_node_pool_in == nullptr) return;
-	build_bvh_node_pool = build_bvh_node_pool_in;
-	output_bvh_node_pool = output_bvh_node_pool_in;
 
 	uint32_t *tris, verts_len, tris_len;
 	vec<3> *verts, max, min;
 
 	parse_mesh(file_path, tris, tris_len, verts, verts_len, max, min);
-	
+
 	bvh_node root; root.tris = tris; root.tris_len = tris_len; root.max = max; root.min = min;
 	std::atomic<uint16_t> nodes_len = 0;
+
+	std::cout << "bvh start\n";
 	build_bvh_node(&root, verts, nodes_len);
+	std::cout << "bvh end\n";
+	auto end = std::chrono::high_resolution_clock::now();
+
+	std::cout << "Time taken in us: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "\n";
 
 	const auto &dst = file_path.parent_path().parent_path() / "baked" / file_path.filename();
 
@@ -194,7 +187,9 @@ void build_bvh(const std::filesystem::path &file_path, std::atomic<uint> &curr_t
 
 	memcpy(output_buffer, &nodes_len, sizeof(nodes_len));
 	std::atomic<uint16_t> next_pos = 1;
-	output_bvh_node(&root, root.tris, output_buffer + sizeof(nodes_len), next_pos, 0);
+	std::cout << "output start\n";
+	output_bvh_node(&root, tris, output_buffer + sizeof(nodes_len), next_pos, 0);
+	std::cout << "output end\n";
 
 	output.write(output_buffer + sizeof(nodes_len), nodes_len * sizeof(bvh_node_serialised));
 	output.close();
@@ -203,10 +198,6 @@ void build_bvh(const std::filesystem::path &file_path, std::atomic<uint> &curr_t
 	delete[] tris;
 
 	free_bvh_children(&root);
-
-	auto end = std::chrono::high_resolution_clock::now();
-
-	std::cout << "Time taken in us: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "\n";
 
 	curr_thread_count--;
 }

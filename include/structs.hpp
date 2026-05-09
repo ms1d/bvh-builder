@@ -16,5 +16,5 @@ struct bvh_node {
 struct bvh_node_serialised {
 	vec<3> min, max;
 	uint32_t tris_i, tris_len;
-	uint8_t left_i, right_i;
+	uint16_t left_i, right_i;
 };

@@ -13,8 +13,9 @@
 
 
 
-// Simple lightweight thread pool.
+// Simple, lightweight bounded thread pool.
 // To init, provide number of workers + function to run with arg_Ts input
+// Use try_emplace_task() to add a task. if it returns false, the task could not be added
 template<class... arg_Ts>
 class thread_pool {
 	struct task_t {
@@ -22,6 +23,7 @@ class thread_pool {
 
 		std::condition_variable &task_cv;
 		std::atomic<bool> &has_finished;
+		std::mutex &task_mtx;
 	};
 
 	public:
@@ -37,13 +39,21 @@ class thread_pool {
 			}
 		}
 		
-		void emplace_task(std::condition_variable &task_cv, std::atomic<bool> &has_finished, arg_Ts... args) {
+		bool try_emplace_task(std::condition_variable &task_cv, std::atomic<bool> &has_finished, std::mutex &task_mtx, arg_Ts... args) {
+			if (stop.load()) return false;
+			auto curr = busy_workers.fetch_add(1);
+			if (curr >= worker_count) {
+				busy_workers.fetch_sub(1);
+				return false;
+			}
+
 			{
 				std::lock_guard<std::mutex> lock(tasks_mtx);
-				tasks.push(task_t{std::forward_as_tuple(args...), task_cv, has_finished});
+				tasks.push(task_t{std::tuple<arg_Ts...>(args...), task_cv, has_finished, task_mtx});
 			}
 
 			tasks_cv.notify_one();
+			return true;
 		}
 
 		~thread_pool() {
@@ -61,6 +71,8 @@ class thread_pool {
 		std::function<void(arg_Ts...)> func;
 
 		std::vector<std::thread> workers;
+
+		std::atomic<uint> busy_workers = 0;
 
 		const size_t worker_count;
 
@@ -84,8 +96,12 @@ class thread_pool {
 				lock.unlock();
 
 				std::apply(func, t.args);
-				t.has_finished.store(true);
-				t.task_cv.notify_all();
+				{
+					std::lock_guard<std::mutex> task_lock(t.task_mtx);
+					t.has_finished.store(true);
+					t.task_cv.notify_one();
+				}
+				busy_workers--;
 			}
 		}
 
