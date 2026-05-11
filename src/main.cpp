@@ -16,6 +16,9 @@ struct master_state {
 
 
 
+#define SLEEP_PERIOD 5
+
+
 
 int main(int argc, char *argv[]) {
 	if (argc != 3) throw std::runtime_error("You can only pass in 1 arg (-p: path to dir)");

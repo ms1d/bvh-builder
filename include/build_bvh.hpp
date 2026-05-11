@@ -12,7 +12,6 @@
 
 #define MAX_WORKERS 5
 #define THREADS_PER_WORKER 32
-#define SLEEP_PERIOD 5
 
 
 
