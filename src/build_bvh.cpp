@@ -77,7 +77,7 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> &nodes_
 
 	// 3 - Recurse with 2 new threads, await results
 
-	auto fut = res.build_pool->try_emplace_task(node->left, verts, nodes_len, res);
+	auto fut = enable_concurrency ? res.build_pool->try_emplace_task(node->left, verts, nodes_len, res) : std::nullopt;
 	if (fut) {
 		build_bvh_node(node->right, verts, nodes_len, res);
 		fut->wait();
@@ -111,7 +111,7 @@ void output_bvh_node(bvh_node *curr_node, uint32_t *root_tris, char *output_buff
 		curr_node_out.left_i = left_index;
 		curr_node_out.right_i = right_index;
 
-		auto fut = res.output_pool->try_emplace_task(curr_node->left, root_tris, output_buffer, next_pos, left_index, res);
+		auto fut = enable_concurrency ? res.output_pool->try_emplace_task(curr_node->left, root_tris, output_buffer, next_pos, left_index, res) : std::nullopt;
 		if (fut) {
 			output_bvh_node(curr_node->right, root_tris, output_buffer, next_pos, right_index, res);
 			fut->wait();

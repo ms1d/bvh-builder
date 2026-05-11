@@ -57,6 +57,11 @@ void parse_args(int argc, char **argv) {
 			}
 		}
 
+		// concurrency
+		else if (std::strcmp(arg, "-c") == 0) {
+			enable_concurrency = false;
+		}
+
 		else throw std::runtime_error("Unrecognized argument! " + std::string(arg));
 	}
 }

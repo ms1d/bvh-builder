@@ -13,6 +13,7 @@
 // Defaults - overriden in main.cpp
 inline uint masters_count = 5;
 inline uint workers_per_master_count = 32;
+inline bool enable_concurrency = true;
 
 
 
