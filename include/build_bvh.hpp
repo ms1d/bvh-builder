@@ -16,7 +16,7 @@
 
 
 
-void build_bvh(const std::filesystem::path &file_path, std::atomic<uint> &curr_thread_count);
+void build_bvh(const std::filesystem::path &file_path);
 
 void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> &nodes_len);
 

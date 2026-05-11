@@ -3,11 +3,16 @@
 #include <filesystem>
 #include <format>
 #include <stdexcept>
-#include <thread>
 #include <unistd.h>
 #include "build_bvh.hpp"
 
 
+
+struct master_state {
+	std::condition_variable cv;
+	std::atomic<bool> has_finished;
+	std::mutex mtx;
+};
 
 
 
@@ -33,15 +38,17 @@ int main(int argc, char *argv[]) {
 	const auto &cmd = std::format("mv {}/baking/* {}/", path_str, path_str);
 	std::system(cmd.c_str());
 
-	std::atomic<uint> curr_thread_count = 0;
+	master_state states[MAX_WORKERS];
+	thread_pool<std::filesystem::path> master_pool(MAX_WORKERS, build_bvh);
 
 	while (true) {
 		for (const auto &entry : std::filesystem::directory_iterator(path)) {
-			if (entry.is_regular_file() && entry.path().extension() == ".mesh" && curr_thread_count.load() < MAX_WORKERS) {
+			if (entry.is_regular_file() && entry.path().extension() == ".mesh") {
 				const auto &dst = std::filesystem::path(path) / "baking" / entry.path().filename();
 				std::filesystem::copy_file(entry.path(), dst);
-				std::filesystem::remove(entry.path());
-				std::thread(build_bvh, std::filesystem::absolute(dst), std::ref(curr_thread_count)).detach();
+
+				if (master_pool.try_emplace_task(dst)) std::filesystem::remove(entry.path());
+				else std::filesystem::remove(dst);
 			}
 		}
 
