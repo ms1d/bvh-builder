@@ -5,7 +5,9 @@
 #include <atomic>
 #include <condition_variable>
 #include <functional>
+#include <future>
 #include <mutex>
+#include <optional>
 #include <queue>
 #include <stdexcept>
 #include <thread>
@@ -20,10 +22,7 @@ template<class... arg_Ts>
 class thread_pool {
 	struct task_t {
 		std::tuple<arg_Ts...> args;
-
-		std::condition_variable &task_cv;
-		std::atomic<bool> &has_finished;
-		std::mutex &task_mtx;
+		std::promise<void> promise;
 	};
 
 	public:
@@ -39,21 +38,27 @@ class thread_pool {
 			}
 		}
 		
-		bool try_emplace_task(std::condition_variable &task_cv, std::atomic<bool> &has_finished, std::mutex &task_mtx, arg_Ts... args) {
-			if (stop.load()) return false;
+		std::optional<std::future<void>> try_emplace_task(arg_Ts... args) {
+			if (stop.load()) return std::nullopt;
 			auto curr = busy_workers.fetch_add(1);
 			if (curr >= worker_count) {
 				busy_workers.fetch_sub(1);
-				return false;
+				return std::nullopt;
 			}
+
+			task_t task{
+				std::tuple<arg_Ts...>(args...),
+				std::promise<void>()
+			};
+			auto fut = task.promise.get_future();
 
 			{
 				std::lock_guard<std::mutex> lock(tasks_mtx);
-				tasks.push(task_t{std::tuple<arg_Ts...>(args...), task_cv, has_finished, task_mtx});
+				tasks.push(std::move(task));
 			}
 
 			tasks_cv.notify_one();
-			return true;
+			return fut;
 		}
 
 		~thread_pool() {
@@ -96,11 +101,7 @@ class thread_pool {
 				lock.unlock();
 
 				std::apply(func, t.args);
-				{
-					std::lock_guard<std::mutex> task_lock(t.task_mtx);
-					t.has_finished.store(true);
-					t.task_cv.notify_one();
-				}
+				t.promise.set_value();
 				busy_workers--;
 			}
 		}

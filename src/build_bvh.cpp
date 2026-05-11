@@ -1,11 +1,9 @@
 #include <chrono>
-#include <condition_variable>
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
 #include <atomic>
 #include <iostream>
-#include <mutex>
 #include <fstream>
 #include <unistd.h>
 #include "thread_pool.hpp"
@@ -79,13 +77,10 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> &nodes_
 
 	// 3 - Recurse with 2 new threads, await results
 
-	std::condition_variable cv; std::atomic<bool> has_finished = false;
-	std::mutex cv_mtx; std::unique_lock<std::mutex> cv_lock(cv_mtx);
-	if (build_bvh_node_pool.try_emplace_task(cv, has_finished, cv_mtx, node->left, verts, nodes_len)) {
+	auto fut = build_bvh_node_pool.try_emplace_task(node->left, verts, nodes_len);
+	if (fut) {
 		build_bvh_node(node->right, verts, std::ref(nodes_len));
-		cv.wait(cv_lock, [&]() {
-            return has_finished.load();
-        });
+		fut->wait();
     }
 	else {
 		build_bvh_node(node->left, verts, std::ref(nodes_len));
@@ -118,14 +113,10 @@ void output_bvh_node(bvh_node *curr_node, uint32_t *root_tris, char *output_buff
 		curr_node_out.left_i = left_index;
 		curr_node_out.right_i = right_index;
 
-		std::condition_variable cv; std::atomic<bool> has_finished = false;
-		std::mutex cv_mtx; std::unique_lock<std::mutex> cv_lock(cv_mtx);
-
-		if (output_bvh_node_pool.try_emplace_task(cv, has_finished, cv_mtx, curr_node->left, root_tris, output_buffer, next_pos, left_index)) {
+		auto fut = output_bvh_node_pool.try_emplace_task(curr_node->left, root_tris, output_buffer, next_pos, left_index);
+		if (fut) {
 			output_bvh_node(curr_node->right, root_tris, output_buffer, next_pos, right_index);
-			cv.wait(cv_lock, [&]() {
-				return has_finished.load();
-			});
+			fut->wait();
 		} else {
 			output_bvh_node(curr_node->left, root_tris, output_buffer, next_pos, left_index);
 			output_bvh_node(curr_node->right, root_tris, output_buffer, next_pos, right_index);
@@ -146,9 +137,8 @@ void free_bvh_children(bvh_node *node) {
 	delete node->right;
 }
 
-void build_bvh(const std::filesystem::path &file_path, std::atomic<uint> &curr_thread_count) {
+void build_bvh(const std::filesystem::path &file_path) {
 	auto start = std::chrono::high_resolution_clock::now();
-	curr_thread_count++;
 
 	uint32_t *tris, verts_len, tris_len;
 	vec<3> *verts, max, min;
@@ -186,6 +176,4 @@ void build_bvh(const std::filesystem::path &file_path, std::atomic<uint> &curr_t
 	delete[] tris;
 
 	free_bvh_children(&root);
-
-	curr_thread_count--;
 }
