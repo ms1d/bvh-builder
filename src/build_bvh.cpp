@@ -45,13 +45,12 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> &nodes_
 	offset.data[longest_axis] /= 2; offset.data[(longest_axis + 1) % 3] = 0; offset.data[(longest_axis + 2) % 3] = 0;
 
 	// 2 - Create new children
-	bvh_node *left = new bvh_node, *right = new bvh_node;
-	node->left = left; node->right = right;
+	node->left = new bvh_node; node->right = new bvh_node;
 	// Convention: left[i] > mid, right[i] <= mid
-	left->max = node->max; left->min = node->min + offset;
-	right->max = node->max-offset; right->min = node->min;
+	node->left->max = node->max; node->left->min = node->min + offset;
+	node->right->max = node->max-offset; node->right->min = node->min;
 
-	left->left = left->right = right->left = right->right = nullptr;
+	node->left->left = node->left->right = node->right->left = node->right->right = nullptr;
 
 	// Sort tris in place and produce pointers for children
 	// Front is for left, right is for back
@@ -75,22 +74,22 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> &nodes_
 	}
 
 	// front now points to the start of right's nodes
-	right->tris = front; right->tris_len = node->tris_len - (front - node->tris);
-	left->tris = node->tris; left->tris_len = node->tris_len - right->tris_len;
+	node->right->tris = front; node->right->tris_len = node->tris_len - (front - node->tris);
+	node->left->tris = node->tris; node->left->tris_len = node->tris_len - node->right->tris_len;
 
 	// 3 - Recurse with 2 new threads, await results
 
 	std::condition_variable cv; std::atomic<bool> has_finished = false;
 	std::mutex cv_mtx; std::unique_lock<std::mutex> cv_lock(cv_mtx);
-	if (build_bvh_node_pool.try_emplace_task(cv, has_finished, cv_mtx, left, verts, nodes_len)) {
-		build_bvh_node(right, verts, std::ref(nodes_len));
+	if (build_bvh_node_pool.try_emplace_task(cv, has_finished, cv_mtx, node->left, verts, nodes_len)) {
+		build_bvh_node(node->right, verts, std::ref(nodes_len));
 		cv.wait(cv_lock, [&]() {
             return has_finished.load();
         });
     }
 	else {
-		build_bvh_node(left, verts, std::ref(nodes_len));
-		build_bvh_node(right, verts, std::ref(nodes_len));
+		build_bvh_node(node->left, verts, std::ref(nodes_len));
+		build_bvh_node(node->right, verts, std::ref(nodes_len));
 	}
 	
 	
