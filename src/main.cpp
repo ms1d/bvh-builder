@@ -1,18 +1,9 @@
-#include <atomic>
 #include <cstring>
 #include <filesystem>
 #include <format>
 #include <stdexcept>
 #include <unistd.h>
 #include "build_bvh.hpp"
-
-
-
-struct master_state {
-	std::condition_variable cv;
-	std::atomic<bool> has_finished;
-	std::mutex mtx;
-};
 
 
 
@@ -41,7 +32,6 @@ int main(int argc, char *argv[]) {
 	const auto &cmd = std::format("mv {}/baking/* {}/", path_str, path_str);
 	std::system(cmd.c_str());
 
-	master_state states[MAX_WORKERS];
 	thread_pool<std::filesystem::path> master_pool(MAX_WORKERS, build_bvh);
 
 	while (true) {
