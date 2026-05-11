@@ -7,24 +7,70 @@
 
 
 
-#define SLEEP_PERIOD 5
+uint sleep_period = 1;
+
+
+
+std::filesystem::path path;
+
+
+
+void parse_args(int argc, char **argv) {
+	for (int i = 1; i < argc; i++) {
+		auto arg = argv[i];
+
+		// path
+		if (std::strcmp(arg, "-p") == 0) {
+			try {
+				path = std::filesystem::path(argv[++i]);
+				std::filesystem::create_directories(path / "baked");
+				std::filesystem::create_directories(path / "baking");
+			} catch (const std::exception &e) {
+				throw std::runtime_error("Error finding file at path! You probably got it wrong. Details:\n"+std::string(e.what()));
+			}
+		}
+
+		// masters
+		else if (std::strcmp(arg, "-m") == 0){ 
+			try {
+				masters_count = std::stoi(argv[++i]);
+			} catch (const std::exception &e) {
+				throw std::runtime_error("Number of masters must be a uint!");
+			}
+		}
+
+		// workers per master
+		else if (std::strcmp(arg, "-w") == 0) {
+			try {
+				workers_per_master_count = std::stoi(argv[++i]);
+			} catch (const std::exception &e) {
+				throw std::runtime_error("Number of workers per master must be a uint!");
+			}
+		}
+
+		// sleep period
+		else if (std::strcmp(arg, "-s") == 0) {
+			try {
+				sleep_period = std::stoi(argv[++i]); if (sleep_period == 0) sleep_period = 1;
+			} catch (const std::exception &e) {
+				throw std::runtime_error("Sleep period must be a uint!");
+			}
+		}
+
+		else throw std::runtime_error("Unrecognized argument! " + std::string(arg));
+	}
+}
 
 
 
 int main(int argc, char *argv[]) {
-	if (argc != 3) throw std::runtime_error("You can only pass in 1 arg (-p: path to dir)");
-	if (strcmp(argv[1], "-p") != 0) throw std::runtime_error("Flag can only be -p");
-
-	std::filesystem::path path;
-
 	try {
-		path = std::filesystem::path(argv[2]);
-		std::filesystem::create_directories(path / "baked");
-		std::filesystem::create_directories(path / "baking");
+		parse_args(argc, argv);
 	} catch (const std::exception &e) {
-		throw std::runtime_error("Error finding file at path! You probably got it wrong. Details:\n"+std::string(e.what()));
+		throw std::runtime_error(e.what());
 		return 1;
 	}
+
 
 	// Move all unbaked files back to be baked (may occur in e.g. crashes)
 	// Assumes none of these files have been modified!
@@ -32,19 +78,19 @@ int main(int argc, char *argv[]) {
 	const auto &cmd = std::format("mv {}/baking/* {}/", path_str, path_str);
 	std::system(cmd.c_str());
 
-	thread_pool<std::filesystem::path, master_resource&> master_pool(MAX_WORKERS, build_bvh);
-	master_resource resources[MAX_WORKERS];
-	for (int i = 0; i < MAX_WORKERS; i++) {
+	thread_pool<std::filesystem::path, master_resource&> master_pool(masters_count, build_bvh);
+	master_resource *resources = new master_resource[masters_count];
+	for (uint i = 0; i < masters_count; i++) {
 		// Never freed since program should run indefinitely
-		resources[i].build_pool = new thread_pool<bvh_node*, vec<3>*, std::atomic<uint16_t>&, master_resource&>(THREADS_PER_WORKER, build_bvh_node);
-		resources[i].output_pool = new thread_pool<bvh_node*, uint32_t*, char*, std::atomic<uint16_t>&, uint16_t, master_resource&>(THREADS_PER_WORKER, output_bvh_node);
+		resources[i].build_pool = new thread_pool<bvh_node*, vec<3>*, std::atomic<uint16_t>&, master_resource&>(workers_per_master_count, build_bvh_node);
+		resources[i].output_pool = new thread_pool<bvh_node*, uint32_t*, char*, std::atomic<uint16_t>&, uint16_t, master_resource&>(workers_per_master_count, output_bvh_node);
 	}
 
 	while (true) {
 		for (const auto &entry : std::filesystem::directory_iterator(path)) {
 			if (entry.is_regular_file() && entry.path().extension() == ".mesh") {
 				int index = -1;
-				for (int i = 0; i < MAX_WORKERS && index == -1; i++) {
+				for (uint i = 0; i < masters_count && index == -1; i++) {
 					if (!resources[i].busy.load()) {
 						resources[i].busy = true;
 						index = i;
@@ -59,7 +105,7 @@ int main(int argc, char *argv[]) {
 			}
 		}
 
-		sleep(SLEEP_PERIOD);
+		sleep(sleep_period);
 	}
 
 	return 1;

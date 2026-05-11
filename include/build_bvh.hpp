@@ -10,8 +10,9 @@
 
 
 
-#define MAX_WORKERS 5
-#define THREADS_PER_WORKER 32
+// Defaults - overriden in main.cpp
+inline uint masters_count = 5;
+inline uint workers_per_master_count = 32;
 
 
 
