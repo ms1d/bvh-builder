@@ -31,7 +31,7 @@ void find_min_max_verts(vec<3> *verts, uint32_t *tris, uint32_t len, vec<3> &out
 
 
 
-void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> &nodes_len) {
+void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> &nodes_len, master_resource &res) {
 
 	// If node has few tris, do not recurse; return to caller
 	if (node->tris_len <= MAX_TRIS) { nodes_len.fetch_add(1); return; }
@@ -77,17 +77,15 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> &nodes_
 
 	// 3 - Recurse with 2 new threads, await results
 
-	auto fut = build_bvh_node_pool.try_emplace_task(node->left, verts, nodes_len);
+	auto fut = res.build_pool->try_emplace_task(node->left, verts, nodes_len, res);
 	if (fut) {
-		build_bvh_node(node->right, verts, std::ref(nodes_len));
+		build_bvh_node(node->right, verts, nodes_len, res);
 		fut->wait();
     }
 	else {
-		build_bvh_node(node->left, verts, std::ref(nodes_len));
-		build_bvh_node(node->right, verts, std::ref(nodes_len));
+		build_bvh_node(node->left, verts, nodes_len, res);
+		build_bvh_node(node->right, verts, nodes_len, res);
 	}
-	
-	
 
 	// This node has children so set its tris to nullptr.
 	// Ignore tris_len in this case
@@ -97,7 +95,7 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> &nodes_
 
 
 
-void output_bvh_node(bvh_node *curr_node, uint32_t *root_tris, char *output_buffer, std::atomic<uint16_t> &next_pos, uint16_t curr_bvh_pos) {
+void output_bvh_node(bvh_node *curr_node, uint32_t *root_tris, char *output_buffer, std::atomic<uint16_t> &next_pos, uint16_t curr_bvh_pos, master_resource &res) {
 	if (curr_node == nullptr) return;
 
 	bvh_node_serialised curr_node_out;
@@ -113,13 +111,13 @@ void output_bvh_node(bvh_node *curr_node, uint32_t *root_tris, char *output_buff
 		curr_node_out.left_i = left_index;
 		curr_node_out.right_i = right_index;
 
-		auto fut = output_bvh_node_pool.try_emplace_task(curr_node->left, root_tris, output_buffer, next_pos, left_index);
+		auto fut = res.output_pool->try_emplace_task(curr_node->left, root_tris, output_buffer, next_pos, left_index, res);
 		if (fut) {
-			output_bvh_node(curr_node->right, root_tris, output_buffer, next_pos, right_index);
+			output_bvh_node(curr_node->right, root_tris, output_buffer, next_pos, right_index, res);
 			fut->wait();
 		} else {
-			output_bvh_node(curr_node->left, root_tris, output_buffer, next_pos, left_index);
-			output_bvh_node(curr_node->right, root_tris, output_buffer, next_pos, right_index);
+			output_bvh_node(curr_node->left, root_tris, output_buffer, next_pos, left_index, res);
+			output_bvh_node(curr_node->right, root_tris, output_buffer, next_pos, right_index, res);
 		}
 	}
 
@@ -137,7 +135,7 @@ void free_bvh_children(bvh_node *node) {
 	delete node->right;
 }
 
-void build_bvh(const std::filesystem::path &file_path) {
+void build_bvh(const std::filesystem::path &file_path, master_resource &res) {
 	auto start = std::chrono::high_resolution_clock::now();
 
 	uint32_t *tris, verts_len, tris_len;
@@ -148,7 +146,7 @@ void build_bvh(const std::filesystem::path &file_path) {
 	bvh_node root; root.tris = tris; root.tris_len = tris_len; root.max = max; root.min = min;
 	std::atomic<uint16_t> nodes_len = 0;
 
-	build_bvh_node(&root, verts, nodes_len);
+	build_bvh_node(&root, verts, nodes_len, res);
 	auto end = std::chrono::high_resolution_clock::now();
 
 	std::cout << "Time taken in us: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "\n";
@@ -167,7 +165,7 @@ void build_bvh(const std::filesystem::path &file_path) {
 
 	memcpy(output_buffer, &nodes_len, sizeof(nodes_len));
 	std::atomic<uint16_t> next_pos = 1;
-	output_bvh_node(&root, tris, output_buffer + sizeof(nodes_len), next_pos, 0);
+	output_bvh_node(&root, tris, output_buffer + sizeof(nodes_len), next_pos, 0, res);
 
 	output.write(output_buffer + sizeof(nodes_len), nodes_len * sizeof(bvh_node_serialised));
 	output.close();
@@ -176,4 +174,6 @@ void build_bvh(const std::filesystem::path &file_path) {
 	delete[] tris;
 
 	free_bvh_children(&root);
+
+	res.busy = false;
 }
