@@ -1,4 +1,4 @@
-#include "vec.cuh"
+#include "vec3.cuh"
 #include <cstring>
 #include <filesystem>
 #include <format>

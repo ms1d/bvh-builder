@@ -7,7 +7,7 @@
 #include <fstream>
 #include <unistd.h>
 #include "thread_pool.hpp"
-#include "vec.cuh"
+#include "vec3.cuh"
 #include "parse_mesh.hpp"
 #include "structs.hpp"
 #include "build_bvh.hpp"
