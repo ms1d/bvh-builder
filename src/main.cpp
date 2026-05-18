@@ -83,12 +83,12 @@ int main(int argc, char *argv[]) {
 	const auto &cmd = std::format("mv {}/baking/* {}/", path_str, path_str);
 	std::system(cmd.c_str());
 
-	thread_pool<std::filesystem::path, master_resource&> master_pool(masters_count, build_bvh);
+	thread_pool<build_bvh, std::filesystem::path, master_resource&> master_pool(masters_count);
 	master_resource *resources = new master_resource[masters_count];
 	for (uint i = 0; i < masters_count; i++) {
 		// Never freed since program should run indefinitely
-		resources[i].build_pool = new thread_pool<bvh_node*, vec<3>*, std::atomic<uint16_t>&, master_resource&>(workers_per_master_count, build_bvh_node);
-		resources[i].output_pool = new thread_pool<bvh_node*, uint32_t*, char*, std::atomic<uint16_t>&, uint16_t, master_resource&>(workers_per_master_count, output_bvh_node);
+		resources[i].build_pool = new thread_pool<build_bvh_node, bvh_node*, vec<3>*, std::atomic<uint16_t>&, master_resource&>(workers_per_master_count);
+		resources[i].output_pool = new thread_pool<output_bvh_node, bvh_node*, uint32_t*, char*, std::atomic<uint16_t>&, uint16_t, master_resource&>(workers_per_master_count);
 	}
 
 	while (true) {
