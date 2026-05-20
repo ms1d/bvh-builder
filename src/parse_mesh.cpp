@@ -2,7 +2,6 @@
 #include <cstring>
 #include <filesystem>
 #include <format>
-#include <fstream>
 
 
 
@@ -11,47 +10,62 @@ void parse_mesh(const std::filesystem::path &file_path,
 		vec<3> *&verts, uint32_t &verts_len,
 		vec<3> &max, vec<3> &min) {
 
-	std::ifstream mesh(file_path, std::ios::binary);
-	if (!mesh || !mesh.is_open()) {
+
+	FILE* f = fopen(file_path.c_str(), "rb");
+	if (!f) {
 		auto msg = std::format("Mesh not found at {}", file_path.c_str());
 		throw std::runtime_error(msg);
 	}
-	
-	mesh.seekg(0, std::ios::end);
-	size_t len = mesh.tellg();
-	mesh.seekg(0, std::ios::beg);
 
-	char *base = new char[len];
-	mesh.read(base, len);
-	char *ptr = base;
+	fseek(f, 0, SEEK_END);
+	unsigned long len = ftell(f);
+	fseek(f, 0, SEEK_SET);
+
+	char *base = (char*)malloc(len);
+
+	size_t read_bytes = fread(base, 1, len, f);
+	if (read_bytes != (size_t)len) {
+		fclose(f);
+		auto msg = std::format("Partial read of mesh at {}", file_path.c_str());
+		throw std::runtime_error(msg);
+		free(base);
+	}
+
+	fclose(f);
+
+	char* __restrict ptr = base;
 
 	memcpy(&verts_len, ptr, 4);
 
 	verts = new vec<3>[verts_len];
-
 	ptr += 4;
+
+	float axis[3];
+	float maxx,maxy,maxz; maxx=maxy=maxz=-1e99;
+	float minx,miny,minz; minx=miny=minz=1e99;
+
 	for (uint32_t i = 0; i < verts_len; i++) {
-		float x,y,z;
+		memcpy(axis, ptr, 12);
 
-		memcpy(&x, ptr, 4);
-        memcpy(&y, ptr+4, 4);
-        memcpy(&z, ptr+8, 4);
+		verts[i].x = axis[0];
+		verts[i].y = axis[1];
+		verts[i].z = axis[2];
 
-		auto curr_vec = vec<3>(x,y,z);
-		verts[i] = curr_vec;
-
-		max.x = std::max(max.x, curr_vec.x);
-		max.y = std::max(max.y, curr_vec.y);
-		max.z = std::max(max.z, curr_vec.z);
+		maxx = std::max(maxx, axis[0]);
+		maxy = std::max(maxy, axis[1]);
+		maxz = std::max(maxz, axis[2]);
 		
-		min.x = std::min(min.x, curr_vec.x);
-		min.y = std::min(min.y, curr_vec.y);
-		min.z = std::min(min.z, curr_vec.z);
+		minx = std::min(minx, axis[0]);
+		miny = std::min(miny, axis[1]);
+		minz = std::min(minz, axis[2]);
 
 
 		// stride length = 3 4-byte floats = 12 bytes
 		ptr += 12;
 	}
+
+	max = { maxx, maxy, maxz };
+    min = { minx, miny, minz };
 
 	memcpy(&tris_len, ptr, 4);
 
@@ -59,14 +73,8 @@ void parse_mesh(const std::filesystem::path &file_path,
 
 	// tris_len = number of elements in tris. each triangle is 3 ints
 	tris = new uint32_t[tris_len];
-
-	for (uint32_t i = 0; i < tris_len; i++) {
-		memcpy(&tris[i], ptr, 4);
-
-		// stride length = 3 4-byte uints = 12 bytes
-		ptr += 4;
-	}
+	memcpy(tris, ptr, tris_len * 4);
 
 	// base is a temporary: tris and verts are owned by caller
-	delete[] base;
+	free(base);
 }

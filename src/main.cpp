@@ -105,7 +105,7 @@ int main(int argc, char *argv[]) {
 				const auto &dst = std::filesystem::path(path) / "baking" / entry.path().filename();
 				std::filesystem::copy_file(entry.path(), dst);
 
-				if (index != -1 && master_pool.try_emplace_task(dst, resources[index])) std::filesystem::remove(entry.path());
+				if (index != -1 && master_pool.try_emplace_task(nullptr, dst, resources[index])) std::filesystem::remove(entry.path());
 				else std::filesystem::remove(dst);
 			}
 		}

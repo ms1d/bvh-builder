@@ -77,10 +77,11 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> &nodes_
 
 	// 3 - Recurse with 2 new threads, await results
 
-	auto fut = enable_concurrency ? res.build_pool->try_emplace_task(node->left, verts, nodes_len, res) : std::nullopt;
-	if (fut) {
+	std::atomic<bool> is_ready = false;
+	auto success = enable_concurrency ? res.build_pool->try_emplace_task(&is_ready, node->left, verts, nodes_len, res) : false;
+	if (success) {
 		build_bvh_node(node->right, verts, nodes_len, res);
-		fut->wait();
+		is_ready.wait(false);
     }
 	else {
 		build_bvh_node(node->left, verts, nodes_len, res);
@@ -111,10 +112,11 @@ void output_bvh_node(bvh_node *curr_node, uint32_t *root_tris, char *output_buff
 		curr_node_out.left_i = left_index;
 		curr_node_out.right_i = right_index;
 
-		auto fut = enable_concurrency ? res.output_pool->try_emplace_task(curr_node->left, root_tris, output_buffer, next_pos, left_index, res) : std::nullopt;
-		if (fut) {
+		std::atomic<bool> is_ready = false;
+		auto success = enable_concurrency ? res.output_pool->try_emplace_task(&is_ready, curr_node->left, root_tris, output_buffer, next_pos, left_index, res) : false;
+		if (success) {
 			output_bvh_node(curr_node->right, root_tris, output_buffer, next_pos, right_index, res);
-			fut->wait();
+			is_ready.wait(false);
 		} else {
 			output_bvh_node(curr_node->left, root_tris, output_buffer, next_pos, left_index, res);
 			output_bvh_node(curr_node->right, root_tris, output_buffer, next_pos, right_index, res);
@@ -136,20 +138,23 @@ void free_bvh_children(bvh_node *node) {
 }
 
 void build_bvh(const std::filesystem::path &file_path, master_resource &res) {
-	auto start = std::chrono::high_resolution_clock::now();
+	auto parse_start = std::chrono::high_resolution_clock::now();
 
 	uint32_t *tris, verts_len, tris_len;
 	vec<3> *verts, max, min;
 
 	parse_mesh(file_path, tris, tris_len, verts, verts_len, max, min);
 
+	auto parse_end = std::chrono::high_resolution_clock::now();
+	auto parse_time = std::chrono::duration_cast<std::chrono::microseconds>(parse_end - parse_start).count();
+
 	bvh_node root; root.tris = tris; root.tris_len = tris_len; root.max = max; root.min = min;
 	std::atomic<uint16_t> nodes_len = 0;
 
 	build_bvh_node(&root, verts, nodes_len, res);
-	auto end = std::chrono::high_resolution_clock::now();
 
-	std::cout << "Time taken in us: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "\n";
+	auto build_end = std::chrono::high_resolution_clock::now();
+	auto build_time = std::chrono::duration_cast<std::chrono::microseconds>(build_end - parse_end).count();
 
 	const auto &dst = file_path.parent_path().parent_path() / "baked" / file_path.filename();
 
@@ -166,14 +171,23 @@ void build_bvh(const std::filesystem::path &file_path, master_resource &res) {
 	memcpy(output_buffer, &nodes_len, sizeof(nodes_len));
 	std::atomic<uint16_t> next_pos = 1;
 	output_bvh_node(&root, tris, output_buffer + sizeof(nodes_len), next_pos, 0, res);
+	auto output_end = std::chrono::high_resolution_clock::now();
+	auto output_time = std::chrono::duration_cast<std::chrono::microseconds>(output_end - build_end).count();
 
 	output.write(output_buffer + sizeof(nodes_len), nodes_len * sizeof(bvh_node_serialised));
 	output.close();
+
+	auto write_end = std::chrono::high_resolution_clock::now();
+	auto write_time = std::chrono::duration_cast<std::chrono::microseconds>(write_end - output_end).count();
 
 	delete[] verts;
 	delete[] tris;
 
 	free_bvh_children(&root);
-
+	
+	auto free_end = std::chrono::high_resolution_clock::now();
+	auto free_time = std::chrono::duration_cast<std::chrono::microseconds>(free_end - write_end).count();
+	std::cout << "parsed in " << parse_time << " us, built in " << build_time << " us, output in " << output_time << " us, written in " << write_time << " us, freed in " << free_time << " us" << std::endl;
+	std::cout << "total time " << parse_time + build_time + output_time + write_time + free_time << " us" << std::endl;
 	res.busy = false;
 }
