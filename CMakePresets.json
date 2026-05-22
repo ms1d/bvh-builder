@@ -2,6 +2,30 @@
 	"version": 3,
 	"configurePresets": [
 		{
+			"name": "pedantic",
+			"displayName": "Pedantic",
+			"generator": "Ninja",
+			"binaryDir": "build/pedantic",
+			"cacheVariables": {
+				"CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+				"BUILD_TESTS": "OFF",
+				"CMAKE_CXX_FLAGS": "-g -Wall -Wextra -Wpedantic -Og -fuse-ld=gold -fsanitize=address,undefined",
+				"CMAKE_UNITY_BUILD": "OFF"
+			}
+		},
+		{
+			"name": "pedantic-thread",
+			"displayName": "Pedantic Thread",
+			"generator": "Ninja",
+			"binaryDir": "build/pedantic-thread",
+			"cacheVariables": {
+				"CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+				"BUILD_TESTS": "OFF",
+				"CMAKE_CXX_FLAGS": "-g -Wall -Wextra -Wpedantic -Og -fuse-ld=gold -fsanitize=thread",
+				"CMAKE_UNITY_BUILD": "OFF"
+			}
+		},
+		{
 			"name": "dev",
 			"displayName": "Development",
 			"generator": "Ninja",
@@ -37,6 +61,14 @@
 		{
 			"name": "rel",
 			"configurePreset": "rel"
+		},
+		{
+			"name": "pedantic",
+			"configurePreset": "pedantic"
+		},
+		{
+			"name": "pedantic-thread",
+			"configurePreset": "pedantic-thread"
 		}
 	]
 }
