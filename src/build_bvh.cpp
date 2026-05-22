@@ -54,11 +54,11 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> &nodes_
 	// Front is for left, right is for back
 	uint *front = node->tris, *back = node->tris + node->tris_len - 1;
 	while (front < back) {
-		vec<3> left_tri_verts[3] { verts[(*front)], verts[*(front+1)], verts[*(front+2)] };
-		vec<3> right_tri_verts[3] { verts[*(back-2)], verts[*(back-1)], verts[*(back)] };
+		vec<3> *left_tri_verts[3] { &verts[(*front)], &verts[*(front+1)], &verts[*(front+2)] };
+		vec<3> *right_tri_verts[3] { &verts[*(back-2)], &verts[*(back-1)], &verts[*(back)] };
 
-		bool left_correct = left_tri_verts[0][longest_axis] > offset[longest_axis] + node->min.data[longest_axis],
-			 right_correct = right_tri_verts[0][longest_axis] <= node->min.data[longest_axis] + offset[longest_axis];
+		bool left_correct = left_tri_verts[0]->data[longest_axis] > offset[longest_axis] + node->min.data[longest_axis],
+			 right_correct = right_tri_verts[0]->data[longest_axis] <= node->min.data[longest_axis] + offset[longest_axis];
 
 		if (!left_correct && !right_correct) {
 			std::swap(*front, *(back-2));
