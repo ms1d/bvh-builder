@@ -9,7 +9,7 @@
 			"cacheVariables": {
 				"CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
 				"BUILD_TESTS": "OFF",
-				"CMAKE_CXX_FLAGS": "-g -Wall -Wextra -Wpedantic -Og -fuse-ld=gold -fsanitize=address,undefined",
+				"CMAKE_CXX_FLAGS": "-g -Wall -Wextra -Wpedantic -Wshadow -Wnull-dereference -Wconversion -Og -fuse-ld=gold -fsanitize=address,undefined",
 				"CMAKE_UNITY_BUILD": "OFF"
 			}
 		},
