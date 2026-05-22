@@ -38,7 +38,7 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> &nodes_
 	// 1 - Split BVH by longest axis
 	vec<3> offset(node->max - node->min);
 	int longest_axis = 0;
-	for (int i = 1; i < 3; i++) longest_axis = offset[i] > offset[longest_axis] ? i : longest_axis;
+	for (int i = 1; i < 3; i++) longest_axis = offset.data[i] > offset.data[longest_axis] ? i : longest_axis;
 	offset.data[longest_axis] /= 2; offset.data[(longest_axis + 1) % 3] = 0; offset.data[(longest_axis + 2) % 3] = 0;
 
 	// 2 - Create new children
@@ -54,8 +54,8 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> &nodes_
 	uint *front = node->tris, *back = node->tris + node->tris_len - 1;
 	uint32_t tmp;
 	while (front < back) {
-		bool left_correct = verts[(*front)].data[longest_axis] > offset[longest_axis] + node->min.data[longest_axis],
-			 right_correct = verts[*(back-2)].data[longest_axis] <= node->min.data[longest_axis] + offset[longest_axis];
+		bool left_correct = verts[(*front)].data[longest_axis] > offset.data[longest_axis] + node->min.data[longest_axis],
+			 right_correct = verts[*(back-2)].data[longest_axis] <= node->min.data[longest_axis] + offset.data[longest_axis];
 
 		if (!left_correct && !right_correct) {
 			// hot path!! fix
