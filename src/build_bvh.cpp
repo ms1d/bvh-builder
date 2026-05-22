@@ -1,4 +1,3 @@
-#include <chrono>
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
@@ -53,17 +52,24 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> &nodes_
 	// Sort tris in place and produce pointers for children
 	// Front is for left, right is for back
 	uint *front = node->tris, *back = node->tris + node->tris_len - 1;
+	uint32_t tmp;
 	while (front < back) {
-		vec<3> *left_tri_verts[3] { &verts[(*front)], &verts[*(front+1)], &verts[*(front+2)] };
-		vec<3> *right_tri_verts[3] { &verts[*(back-2)], &verts[*(back-1)], &verts[*(back)] };
-
-		bool left_correct = left_tri_verts[0]->data[longest_axis] > offset[longest_axis] + node->min.data[longest_axis],
-			 right_correct = right_tri_verts[0]->data[longest_axis] <= node->min.data[longest_axis] + offset[longest_axis];
+		bool left_correct = verts[(*front)].data[longest_axis] > offset[longest_axis] + node->min.data[longest_axis],
+			 right_correct = verts[*(back-2)].data[longest_axis] <= node->min.data[longest_axis] + offset[longest_axis];
 
 		if (!left_correct && !right_correct) {
-			std::swap(*front, *(back-2));
-			std::swap(*(front+1), *(back-1));
-			std::swap(*(front+2), *back);
+			// hot path!! fix
+			tmp = *front;
+			*front = *(back-2);
+			*(back-2) = tmp;
+
+			tmp = *(front+1);
+			*(front+1) = *(back-1);
+			*(back-1) = tmp;
+
+			tmp = *(front+2);
+			*(front+2) = *back;
+			*back = tmp;
 		}
 		else {
 			left_correct ? front += 3 : 0;
@@ -138,23 +144,15 @@ void free_bvh_children(bvh_node *node) {
 }
 
 void build_bvh(const std::filesystem::path &file_path, master_resource &res) {
-	auto parse_start = std::chrono::high_resolution_clock::now();
-
 	uint32_t *tris, verts_len, tris_len;
 	vec<3> *verts, max, min;
 
 	parse_mesh(file_path, tris, tris_len, verts, verts_len, max, min);
 
-	auto parse_end = std::chrono::high_resolution_clock::now();
-	auto parse_time = std::chrono::duration_cast<std::chrono::microseconds>(parse_end - parse_start).count();
-
 	bvh_node root; root.tris = tris; root.tris_len = tris_len; root.max = max; root.min = min;
 	std::atomic<uint16_t> nodes_len = 0;
 
 	build_bvh_node(&root, verts, nodes_len, res);
-
-	auto build_end = std::chrono::high_resolution_clock::now();
-	auto build_time = std::chrono::duration_cast<std::chrono::microseconds>(build_end - parse_end).count();
 
 	const auto &dst = file_path.parent_path().parent_path() / "baked" / file_path.filename();
 
@@ -171,23 +169,14 @@ void build_bvh(const std::filesystem::path &file_path, master_resource &res) {
 	memcpy(output_buffer, &nodes_len, sizeof(nodes_len));
 	std::atomic<uint16_t> next_pos = 1;
 	output_bvh_node(&root, tris, output_buffer + sizeof(nodes_len), next_pos, 0, res);
-	auto output_end = std::chrono::high_resolution_clock::now();
-	auto output_time = std::chrono::duration_cast<std::chrono::microseconds>(output_end - build_end).count();
 
 	output.write(output_buffer + sizeof(nodes_len), nodes_len * sizeof(bvh_node_serialised));
 	output.close();
-
-	auto write_end = std::chrono::high_resolution_clock::now();
-	auto write_time = std::chrono::duration_cast<std::chrono::microseconds>(write_end - output_end).count();
 
 	delete[] verts;
 	delete[] tris;
 
 	free_bvh_children(&root);
-	
-	auto free_end = std::chrono::high_resolution_clock::now();
-	auto free_time = std::chrono::duration_cast<std::chrono::microseconds>(free_end - write_end).count();
-	std::cout << "parsed in " << parse_time << " us, built in " << build_time << " us, output in " << output_time << " us, written in " << write_time << " us, freed in " << free_time << " us" << std::endl;
-	std::cout << "total time " << parse_time + build_time + output_time + write_time + free_time << " us" << std::endl;
+
 	res.busy = false;
 }
