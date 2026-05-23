@@ -51,30 +51,21 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> &nodes_
 
 	// Sort tris in place and produce pointers for children
 	// Front is for left, right is for back
-	uint *front = node->tris, *back = node->tris + node->tris_len - 1;
-	uint32_t tmp;
+	uint *front = node->tris, *back = node->tris + node->tris_len - 3;
+	const float mid = offset.data[longest_axis] + node->min.data[longest_axis];
+	
 	while (front < back) {
-		bool left_correct = verts[(*front)].data[longest_axis] > offset.data[longest_axis] + node->min.data[longest_axis],
-			 right_correct = verts[*(back-2)].data[longest_axis] <= node->min.data[longest_axis] + offset.data[longest_axis];
+		bool lc = verts[(*front)].data[longest_axis] > mid,
+			 rc = verts[*(back)].data[longest_axis] <= mid;
 
-		if (!left_correct && !right_correct) {
-			// hot path!! fix
-			tmp = *front;
-			*front = *(back-2);
-			*(back-2) = tmp;
+		if (lc) front += 3;
+		if (rc) back  -= 3;
+		if (!(lc | rc)) {
+			uint f0 = front[0], f1 = front[1], f2 = front[2];
+			uint b0 = back[0],  b1 = back[1],  b2 = back[2];
 
-			tmp = *(front+1);
-			*(front+1) = *(back-1);
-			*(back-1) = tmp;
-
-			tmp = *(front+2);
-			*(front+2) = *back;
-			*back = tmp;
-		}
-		else {
-			left_correct ? front += 3 : 0;
-			right_correct ? back -= 3 : 0;
-		}
+			front[0]=b0; front[1]=b1; front[2]=b2;
+			back[0]=f0;  back[1]=f1;  back[2]=f2;}
 	}
 
 	// front now points to the start of right's nodes
