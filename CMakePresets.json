@@ -18,7 +18,7 @@
 			"name": "dev-thread",
 			"displayName": "Development (-fsanitize=thread)",
 			"generator": "Ninja",
-			"binaryDir": "build/pedantic-thread",
+			"binaryDir": "build/dev-thread",
 			"cacheVariables": {
 				"CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
 				"BUILD_TESTS": "OFF",
