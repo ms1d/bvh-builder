@@ -39,6 +39,20 @@
 				"CMAKE_CXX_FLAGS": "-O3 -DNDEBUG -flto=auto -fuse-ld=gold",
 				"CMAKE_UNITY_BUILD": "ON"
 			}
+		},
+
+		{
+			"name": "prf",
+			"displayName": "profile",
+			"generator": "Ninja",
+			"binaryDir": "build/prf",
+			"cacheVariables": {
+				"CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+				"CMAKE_BUILD_TYPE": "Release",
+				"BUILD_TESTS": "OFF",
+				"CMAKE_CXX_FLAGS": "-O3 -DNDEBUG -flto=auto -fuse-ld=gold -g",
+				"CMAKE_UNITY_BUILD": "ON"
+			}
 		}
 	],
 
@@ -54,6 +68,10 @@
 		{
 			"name": "dev-thread",
 			"configurePreset": "dev-thread"
+		},
+		{
+			"name": "prf",
+			"configurePreset": "prf"
 		}
 	]
 }
