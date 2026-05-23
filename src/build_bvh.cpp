@@ -78,7 +78,7 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> &nodes_
 	}
 
 	// front now points to the start of right's nodes
-	node->right->tris = front; node->right->tris_len = node->tris_len - (front - node->tris);
+	node->right->tris = front; node->right->tris_len = static_cast<uint32_t>(node->tris_len - (front - node->tris));
 	node->left->tris = node->tris; node->left->tris_len = node->tris_len - node->right->tris_len;
 
 	// 3 - Recurse with 2 new threads, await results
@@ -109,7 +109,7 @@ void output_bvh_node(bvh_node *curr_node, uint32_t *root_tris, char *output_buff
 	curr_node_out.max = curr_node->max; curr_node_out.min = curr_node->min;
 
 	if (curr_node->tris != nullptr) { 
-		curr_node_out.tris_i = curr_node->tris - root_tris;
+		curr_node_out.tris_i = static_cast<uint32_t>(curr_node->tris - root_tris);
 		curr_node_out.tris_len = curr_node->tris_len;
 		curr_node_out.left_i = curr_node_out.right_i = 0;
 	}
