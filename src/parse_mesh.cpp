@@ -18,13 +18,13 @@ void parse_mesh(const std::filesystem::path &file_path,
 	}
 
 	fseek(f, 0, SEEK_END);
-	unsigned long len = ftell(f);
+	auto len = static_cast<size_t>(ftell(f));
 	fseek(f, 0, SEEK_SET);
 
-	char *base = (char*)malloc(len);
+	char *base = static_cast<char*>(malloc(len));
 
 	size_t read_bytes = fread(base, 1, len, f);
-	if (read_bytes != (size_t)len) {
+	if (read_bytes != len) {
 		fclose(f);
 		auto msg = std::format("Partial read of mesh at {}", file_path.c_str());
 		throw std::runtime_error(msg);
@@ -40,24 +40,21 @@ void parse_mesh(const std::filesystem::path &file_path,
 	verts = new vec<3>[verts_len];
 	ptr += 4;
 
-	float axis[3];
-	float maxx,maxy,maxz; maxx=maxy=maxz=-1e99;
-	float minx,miny,minz; minx=miny=minz=1e99;
+	memcpy(verts, ptr, verts_len * 12);
+
+	float maxx,maxy,maxz; maxx=maxy=maxz=-1e10;
+	float minx,miny,minz; minx=miny=minz=1e10;
 
 	for (uint32_t i = 0; i < verts_len; i++) {
-		memcpy(axis, ptr, 12);
+		auto v = verts[i];
 
-		verts[i].x = axis[0];
-		verts[i].y = axis[1];
-		verts[i].z = axis[2];
-
-		maxx = std::max(maxx, axis[0]);
-		maxy = std::max(maxy, axis[1]);
-		maxz = std::max(maxz, axis[2]);
+		maxx = std::max(maxx, v.x);
+		maxy = std::max(maxy, v.y);
+		maxz = std::max(maxz, v.z);
 		
-		minx = std::min(minx, axis[0]);
-		miny = std::min(miny, axis[1]);
-		minz = std::min(minz, axis[2]);
+		minx = std::min(minx, v.x);
+		miny = std::min(miny, v.y);
+		minz = std::min(minz, v.z);
 
 
 		// stride length = 3 4-byte floats = 12 bytes
