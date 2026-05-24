@@ -10,7 +10,7 @@
 #include "parse_mesh.hpp"
 #include "structs.hpp"
 #include "build_bvh.hpp"
-#include <stdfloat>
+#include <immintrin.h>
 
 
 
@@ -100,19 +100,12 @@ void output_bvh_node(bvh_node *curr_node, uint32_t *root_tris, char *bvh_output_
 
 	bvh_node_serialised curr_node_out;
 
-	auto half_x = static_cast<_Float16>(curr_node->max.x);
-	auto half_y = static_cast<_Float16>(curr_node->max.y);
-	auto half_z = static_cast<_Float16>(curr_node->max.z);
-	memcpy(&curr_node_out.max.x, &half_x, sizeof(uint16_t));
-	memcpy(&curr_node_out.max.y, &half_y, sizeof(uint16_t));
-	memcpy(&curr_node_out.max.z, &half_z, sizeof(uint16_t));
-
-	half_x = static_cast<_Float16>(curr_node->min.x);
-    half_y = static_cast<_Float16>(curr_node->min.y);
-    half_z = static_cast<_Float16>(curr_node->min.z);
-    memcpy(&curr_node_out.min.x, &half_x, sizeof(uint16_t));
-    memcpy(&curr_node_out.min.y, &half_y, sizeof(uint16_t));
-    memcpy(&curr_node_out.min.z, &half_z, sizeof(uint16_t));
+	curr_node_out.max.x = _cvtss_sh(curr_node->max.x, 0);
+	curr_node_out.max.y = _cvtss_sh(curr_node->max.y, 0);
+	curr_node_out.max.z = _cvtss_sh(curr_node->max.z, 0);
+	curr_node_out.min.x = _cvtss_sh(curr_node->min.x, 0);
+	curr_node_out.min.y = _cvtss_sh(curr_node->min.y, 0);
+	curr_node_out.min.z = _cvtss_sh(curr_node->min.z, 0);
 
 	if (curr_node->tris != nullptr) { // MSB = is_leaf = 1
 		// Assuming that tris index fits in 31 bits (i.e. MSB = 1)

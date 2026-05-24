@@ -9,7 +9,7 @@
 			"cacheVariables": {
 				"CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
 				"BUILD_TESTS": "OFF",
-				"CMAKE_CXX_FLAGS": "-g -Wall -Wextra -Wpedantic -Wshadow -Wnull-dereference -Wconversion -Og -fuse-ld=gold -fsanitize=address,undefined",
+				"CMAKE_CXX_FLAGS": "-g -Wall -Wextra -Wpedantic -Wshadow -Wnull-dereference -Wconversion -Og -fuse-ld=gold -fsanitize=address,undefined -mf16c",
 				"CMAKE_UNITY_BUILD": "OFF"
 			}
 		},
@@ -22,7 +22,7 @@
 			"cacheVariables": {
 				"CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
 				"BUILD_TESTS": "OFF",
-				"CMAKE_CXX_FLAGS": "-g -Wall -Wextra -Wpedantic -Wshadow -Wnull-dereference -Wconversion -Og -fuse-ld=gold -fsanitize=thread",
+				"CMAKE_CXX_FLAGS": "-g -Wall -Wextra -Wpedantic -Wshadow -Wnull-dereference -Wconversion -Og -fuse-ld=gold -fsanitize=thread -mf16c",
 				"CMAKE_UNITY_BUILD": "OFF"
 			}
 		},
@@ -36,7 +36,7 @@
 				"CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
 				"CMAKE_BUILD_TYPE": "Release",
 				"BUILD_TESTS": "OFF",
-				"CMAKE_CXX_FLAGS": "-O3 -DNDEBUG -flto=auto -fuse-ld=gold",
+				"CMAKE_CXX_FLAGS": "-O3 -DNDEBUG -flto=auto -fuse-ld=gold -mf16c",
 				"CMAKE_UNITY_BUILD": "ON"
 			}
 		},
@@ -50,7 +50,7 @@
 				"CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
 				"CMAKE_BUILD_TYPE": "Release",
 				"BUILD_TESTS": "OFF",
-				"CMAKE_CXX_FLAGS": "-O3 -DNDEBUG -flto=auto -fuse-ld=gold -g",
+				"CMAKE_CXX_FLAGS": "-O3 -DNDEBUG -flto=auto -fuse-ld=gold -g -mf16c",
 				"CMAKE_UNITY_BUILD": "ON"
 			}
 		}
