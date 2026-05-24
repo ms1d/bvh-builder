@@ -1,3 +1,4 @@
+#include <chrono>
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
@@ -143,46 +144,116 @@ void free_bvh_children(bvh_node *node) {
 	delete node->right;
 }
 
+
+
 void build_bvh(const std::filesystem::path &file_path, master_resource &res) {
+	auto s = std::chrono::high_resolution_clock::now();
+
 	uint32_t *tris, verts_len, tris_len;
 	vec<3> *verts, max, min;
 
+	auto s_mesh = std::chrono::high_resolution_clock::now();
 	parse_mesh(file_path, tris, tris_len, verts, verts_len, max, min);
+	auto e_mesh = std::chrono::high_resolution_clock::now();
 
 	bvh_node root; root.tris = tris; root.tris_len = tris_len; root.max = max; root.min = min;
 	std::atomic<uint16_t> nodes_len = 0;
 
+	auto s_bvh = std::chrono::high_resolution_clock::now();
 	build_bvh_node(&root, verts, nodes_len, res);
+	auto e_bvh = std::chrono::high_resolution_clock::now();
 
+	auto s_file = std::chrono::high_resolution_clock::now();
 	const auto &dst = file_path.parent_path().parent_path() / "baked" / file_path.filename();
 
 	std::filesystem::copy(file_path, dst);
 	std::filesystem::remove(file_path);
 
+	auto t3 = std::chrono::high_resolution_clock::now();
+
 	std::ofstream output(dst, std::ios::binary | std::ios::trunc);
+	auto m_file = std::chrono::high_resolution_clock::now();
 
 	// copy verts len, verts, tris len and tris in that order
-	
-	output.write(reinterpret_cast<const char*>(&verts_len), sizeof(verts_len));
-	output.write(reinterpret_cast<const char*>(verts), verts_len * sizeof(vec<3>));
-	output.write(reinterpret_cast<const char*>(&tris_len), sizeof(tris_len));
-	output.write(reinterpret_cast<const char*>(tris), tris_len * sizeof(uint32_t));
+	// HOTSPOT!	
+	auto verts_space = verts_len * sizeof(vec<3>),
+		   tris_space = tris_len * sizeof(uint32_t),
+		   nodes_space = nodes_len * sizeof(bvh_node_serialised);
 
-	char *bvh_output_buffer = new char[
-		+ sizeof(nodes_len)
-		+ nodes_len * sizeof(bvh_node_serialised) // bvh_nodes
+	char *output_buffer = new char[
+		sizeof(verts_len) + verts_space
+		+ sizeof(tris_len) + tris_space
+		+ sizeof(nodes_len) + nodes_space
 	];
 
-	memcpy(bvh_output_buffer, &nodes_len, sizeof(nodes_len));
-	output_bvh_node(&root, tris, bvh_output_buffer + sizeof(nodes_len), 0, res);
+	char *ptr = output_buffer;
+	memcpy(ptr, &verts_len, sizeof(verts_len)); ptr += sizeof(verts_len);
+	memcpy(ptr, verts, verts_space); ptr += verts_space;
+	auto t5 = std::chrono::high_resolution_clock::now();
+	memcpy(ptr, &tris_len, sizeof(tris_len)); ptr += sizeof(tris_len);
+	memcpy(ptr, tris, tris_space); ptr += tris_space;
+	output.write(output_buffer, static_cast<long>(sizeof(verts_len) + verts_space + sizeof(tris_len) + tris_space));
 
-	output.write(bvh_output_buffer + sizeof(nodes_len), nodes_len * sizeof(bvh_node_serialised));
+	auto e_file = std::chrono::high_resolution_clock::now();
+
+	// Last use of ptr
+	memcpy(ptr += sizeof(nodes_len), &nodes_len, sizeof(nodes_len));
+	auto s_out = std::chrono::high_resolution_clock::now();
+	output_bvh_node(&root, tris, ptr + sizeof(nodes_len), 0, res);
+	auto e_out = std::chrono::high_resolution_clock::now();
+
+
+	auto s_file2 = std::chrono::high_resolution_clock::now();
+	output.write(output_buffer + sizeof(nodes_len), nodes_len * sizeof(bvh_node_serialised));
 	output.close();
+	auto e_file2 = std::chrono::high_resolution_clock::now();
 
 	delete[] verts;
 	delete[] tris;
+	delete[] output_buffer;
 
 	free_bvh_children(&root);
 
 	res.busy = false;
+	auto e = std::chrono::high_resolution_clock::now();
+
+	std::cout << "\n========== BVH BUILD PROFILE ==========\n";
+
+	std::cout << "Total time: "
+			  << std::chrono::duration_cast<std::chrono::milliseconds>(e - s).count()
+			  << "ms\n";
+
+	std::cout << "Mesh parse: "
+			  << std::chrono::duration_cast<std::chrono::milliseconds>(e_mesh - s_mesh).count()
+			  << "ms\n";
+
+	std::cout << "BVH build: "
+			  << std::chrono::duration_cast<std::chrono::milliseconds>(e_bvh - s_bvh).count()
+			  << "ms\n";
+
+	std::cout << "File copy + remove: "
+			  << std::chrono::duration_cast<std::chrono::milliseconds>(t3 - s_file).count()
+			  << "ms\n";
+
+	std::cout << "File open: "
+			  << std::chrono::duration_cast<std::chrono::milliseconds>(m_file - t3).count()
+			  << "ms\n";
+
+	std::cout << "CPU staging (verts memcpy + tris_len prep): "
+			  << std::chrono::duration_cast<std::chrono::milliseconds>(t5 - m_file).count()
+			  << "ms\n";
+
+	std::cout << "First disk write (verts + tris): "
+			  << std::chrono::duration_cast<std::chrono::milliseconds>(e_file - t5).count()
+			  << "ms\n";
+
+	std::cout << "BVH serialization: "
+			  << std::chrono::duration_cast<std::chrono::milliseconds>(e_out - s_out).count()
+			  << "ms\n";
+
+	std::cout << "Final disk write + close: "
+			  << std::chrono::duration_cast<std::chrono::milliseconds>(e_file2 - s_file2).count()
+			  << "ms\n";
+
+	std::cout << "======================================\n";
 }
