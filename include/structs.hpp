@@ -14,7 +14,10 @@ struct bvh_node {
 };
 
 struct bvh_node_serialised {
-	vec<3> min, max;
-	uint32_t tris_i, tris_len;
-	uint16_t left_i, right_i;
+	vec<3, uint16_t> min, max;
+
+	// MSB - is_leaf
+	// if is_leaf - 31 bits for tris_index
+	// else - 15 bits for left, 16 bits for right
+	uint32_t payload;
 };
