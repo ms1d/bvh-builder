@@ -88,7 +88,7 @@ int main(int argc, char *argv[]) {
 	for (uint i = 0; i < masters_count; i++) {
 		// Never freed since program should run indefinitely
 		resources[i].build_pool = new thread_pool<build_bvh_node, bvh_node*, vec<3>*, std::atomic<uint16_t>&, master_resource&>(workers_per_master_count);
-		resources[i].output_pool = new thread_pool<output_bvh_node, bvh_node*, uint32_t*, char*, std::atomic<uint16_t>&, uint16_t, master_resource&>(workers_per_master_count);
+		resources[i].output_pool = new thread_pool<output_bvh_node, bvh_node*, uint32_t*, char*, uint16_t, master_resource&>(workers_per_master_count);
 	}
 
 	while (true) {

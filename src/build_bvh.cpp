@@ -94,7 +94,7 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> &nodes_
 
 
 
-void output_bvh_node(bvh_node *curr_node, uint32_t *root_tris, char *bvh_output_buffer, std::atomic<uint16_t> &next_pos, uint16_t curr_bvh_pos, master_resource &res) {
+void output_bvh_node(bvh_node *curr_node, uint32_t *root_tris, char *bvh_output_buffer, uint16_t curr_bvh_pos, master_resource &res) {
 	// TODO - assert that all these indices fit in the ranges. For now I assume they do
 	if (curr_node == nullptr) return;
 
@@ -120,19 +120,19 @@ void output_bvh_node(bvh_node *curr_node, uint32_t *root_tris, char *bvh_output_
 		curr_node_out.payload |= (1u << 31);
 	}
 	else { // MSB = is_leaf = 0
-		uint16_t left_index = next_pos++, right_index = next_pos++;
+		uint16_t left_index = 2 * curr_bvh_pos, right_index = left_index + 1;
 		auto li = static_cast<uint32_t>(left_index);
 		// Assuming that left_index fits in 15 bits (i.e. MSB = 0)
 		curr_node_out.payload = (li << 16) | right_index;
 
 		std::atomic<bool> is_ready = false;
-		auto success = enable_concurrency && res.output_pool->try_emplace_task(&is_ready, curr_node->left, root_tris, bvh_output_buffer, next_pos, left_index, res);
+		auto success = enable_concurrency && res.output_pool->try_emplace_task(&is_ready, curr_node->left, root_tris, bvh_output_buffer, left_index, res);
 		if (success) {
-			output_bvh_node(curr_node->right, root_tris, bvh_output_buffer, next_pos, right_index, res);
+			output_bvh_node(curr_node->right, root_tris, bvh_output_buffer, right_index, res);
 			is_ready.wait(false);
 		} else {
-			output_bvh_node(curr_node->left, root_tris, bvh_output_buffer, next_pos, left_index, res);
-			output_bvh_node(curr_node->right, root_tris, bvh_output_buffer, next_pos, right_index, res);
+			output_bvh_node(curr_node->left, root_tris, bvh_output_buffer, left_index, res);
+			output_bvh_node(curr_node->right, root_tris, bvh_output_buffer, right_index, res);
 		}
 	}
 
@@ -181,8 +181,7 @@ void build_bvh(const std::filesystem::path &file_path, master_resource &res) {
 	];
 
 	memcpy(bvh_output_buffer, &nodes_len, sizeof(nodes_len));
-	std::atomic<uint16_t> next_pos = 1;
-	output_bvh_node(&root, tris, bvh_output_buffer + sizeof(nodes_len), next_pos, 0, res);
+	output_bvh_node(&root, tris, bvh_output_buffer + sizeof(nodes_len), 0, res);
 
 	output.write(bvh_output_buffer + sizeof(nodes_len), nodes_len * sizeof(bvh_node_serialised));
 	output.close();
