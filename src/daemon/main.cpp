@@ -1,17 +1,20 @@
 #include <cstring>
 #include <filesystem>
-#include <format>
 #include <stdexcept>
 #include <unistd.h>
 #include "build_bvh.hpp"
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <unistd.h>
 
 
 
 uint sleep_period = 1;
+#define BUFFER_SIZE 50'000'000
 
 
 
-std::filesystem::path path;
+std::filesystem::path path = std::filesystem::current_path();
 
 
 
@@ -19,19 +22,8 @@ void parse_args(int argc, char **argv) {
 	for (int i = 1; i < argc; i++) {
 		auto arg = argv[i];
 
-		// path
-		if (std::strcmp(arg, "-p") == 0) {
-			try {
-				path = std::filesystem::path(argv[++i]);
-				std::filesystem::create_directories(path / "baked");
-				std::filesystem::create_directories(path / "baking");
-			} catch (const std::exception &e) {
-				throw std::runtime_error("Error finding file at path! You probably got it wrong. Details:\n"+std::string(e.what()));
-			}
-		}
-
-		// workers per master
-		else if (std::strcmp(arg, "-w") == 0) {
+		// number of workers
+		if (std::strcmp(arg, "-w") == 0) {
 			try {
 				worker_count = static_cast<uint>(std::stoi(argv[++i]));
 			} catch (const std::exception &e) {
@@ -69,25 +61,41 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
+	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+	struct sockaddr_un addr;
+	memset(&addr, 0, sizeof(addr));
 
-	// Move all unbaked files back to be baked (may occur in e.g. crashes)
-	// Assumes none of these files have been modified!
-	auto path_str = path.c_str();
-	const auto &cmd = std::format("mv {}/baking/* {}/", path_str, path_str);
-	std::system(cmd.c_str());
+	addr.sun_family = AF_UNIX;
+	addr.sun_path[0] = '\0';
+	strcpy(addr.sun_path + 1, "bvh_builderd");
 
-	while (true) {
-		for (const auto &entry : std::filesystem::directory_iterator(path)) {
-			if (entry.is_regular_file() && entry.path().extension() == ".mesh") {
-				const auto &dst = std::filesystem::path(path) / "baking" / entry.path().filename();
-				std::filesystem::copy_file(entry.path(), dst);
-				build_bvh(dst);
-				std::filesystem::remove(entry.path());
-			}
-		}
-
-		sleep(sleep_period);
+	if (bind(fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
+		perror("bind"); return 1;
 	}
 
-	return 1;
+	if (listen(fd, 5) == -1) {
+		perror("listen"); return 1;
+	}
+
+	char *buffer = new char[BUFFER_SIZE], *output_buffer = new char[BUFFER_SIZE];
+
+	perror("bind/listen/accept");
+	printf("server ready\n");
+	while (1) {
+		int client_fd = accept(fd, NULL, NULL);
+	
+		size_t n = static_cast<size_t>(read(client_fd, buffer, sizeof(buffer)));
+
+		write(client_fd, buffer, n);
+		build_bvh(buffer+4, output_buffer);
+
+		close(client_fd);
+	}
+
+	delete[] buffer;
+	delete[] output_buffer;
+
+	close(fd);
+
+	return 2;
 }

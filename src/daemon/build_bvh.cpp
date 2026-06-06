@@ -1,10 +1,8 @@
 #include <chrono>
 #include <cstdint>
 #include <cstring>
-#include <filesystem>
 #include <atomic>
 #include <iostream>
-#include <fstream>
 #include <unistd.h>
 #include "thread_pool.hpp"
 #include "vec3.cuh"
@@ -152,14 +150,14 @@ void free_bvh_children(bvh_node *node) {
 
 
 
-void build_bvh(const std::filesystem::path &file_path) {
+void build_bvh(const char *buffer, char *output_buffer) {
 	auto s = std::chrono::high_resolution_clock::now();
 
 	uint32_t *tris, verts_len, tris_len;
 	vec<3> *verts, max, min;
 
 	auto s_mesh = std::chrono::high_resolution_clock::now();
-	parse_mesh(file_path, tris, tris_len, verts, verts_len, max, min);
+	parse_mesh(buffer, tris, tris_len, verts, verts_len, max, min);
 	auto e_mesh = std::chrono::high_resolution_clock::now();
 
 	bvh_node root; root.tris = tris; root.tris_len = tris_len; root.max = max; root.min = min;
@@ -170,27 +168,15 @@ void build_bvh(const std::filesystem::path &file_path) {
 	auto e_bvh = std::chrono::high_resolution_clock::now();
 
 	auto s_file = std::chrono::high_resolution_clock::now();
-	const auto &dst = file_path.parent_path().parent_path() / "baked" / file_path.filename();
-
-	std::filesystem::copy(file_path, dst);
-	std::filesystem::remove(file_path);
 
 	auto t3 = std::chrono::high_resolution_clock::now();
 
-	std::ofstream output(dst, std::ios::binary | std::ios::trunc);
 	auto m_file = std::chrono::high_resolution_clock::now();
 
 	// copy verts len, verts, tris len and tris in that order
 	// HOTSPOT!	
 	auto verts_space = verts_len * sizeof(vec<3>),
-		   tris_space = tris_len * sizeof(uint32_t),
-		   nodes_space = nodes_len * sizeof(bvh_node_serialised);
-
-	char *output_buffer = new char[
-		sizeof(verts_len) + verts_space
-		+ sizeof(tris_len) + tris_space
-		+ sizeof(nodes_len) + nodes_space
-	];
+		   tris_space = tris_len * sizeof(uint32_t);
 
 	char *ptr = output_buffer;
 	memcpy(ptr, &verts_len, sizeof(verts_len)); ptr += sizeof(verts_len);
@@ -198,7 +184,6 @@ void build_bvh(const std::filesystem::path &file_path) {
 	auto t5 = std::chrono::high_resolution_clock::now();
 	memcpy(ptr, &tris_len, sizeof(tris_len)); ptr += sizeof(tris_len);
 	memcpy(ptr, tris, tris_space); ptr += tris_space;
-	output.write(output_buffer, static_cast<long>(sizeof(verts_len) + verts_space + sizeof(tris_len) + tris_space));
 
 	auto e_file = std::chrono::high_resolution_clock::now();
 
@@ -210,13 +195,10 @@ void build_bvh(const std::filesystem::path &file_path) {
 
 
 	auto s_file2 = std::chrono::high_resolution_clock::now();
-	output.write(output_buffer + sizeof(nodes_len), nodes_len * sizeof(bvh_node_serialised));
-	output.close();
 	auto e_file2 = std::chrono::high_resolution_clock::now();
 
 	delete[] verts;
 	delete[] tris;
-	delete[] output_buffer;
 
 	free_bvh_children(&root);
 

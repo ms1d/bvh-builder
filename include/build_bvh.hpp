@@ -4,7 +4,6 @@
 
 #include <atomic>
 #include <sys/types.h>
-#include <filesystem>
 #include "structs.hpp"
 
 
@@ -15,7 +14,7 @@ inline bool enable_concurrency = true;
 
 
 
-void build_bvh(const std::filesystem::path &file_path);
+void build_bvh(const char *buffer, char *output_buffer);
 
 void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> &nodes_len);
 
