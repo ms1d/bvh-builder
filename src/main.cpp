@@ -33,7 +33,7 @@ void parse_args(int argc, char **argv) {
 		// workers per master
 		else if (std::strcmp(arg, "-w") == 0) {
 			try {
-				worker_count = std::stoi(argv[++i]);
+				worker_count = static_cast<uint>(std::stoi(argv[++i]));
 			} catch (const std::exception &e) {
 				throw std::runtime_error("Number of workers per master must be a uint!");
 			}
@@ -42,7 +42,9 @@ void parse_args(int argc, char **argv) {
 		// sleep period
 		else if (std::strcmp(arg, "-s") == 0) {
 			try {
-				sleep_period = std::stoi(argv[++i]); if (sleep_period == 0) sleep_period = 1;
+				auto tmp = std::stoi(argv[++i]);
+				if (tmp <= 0) tmp = 1;
+				sleep_period = static_cast<uint>(tmp);
 			} catch (const std::exception &e) {
 				throw std::runtime_error("Sleep period must be a uint!");
 			}
