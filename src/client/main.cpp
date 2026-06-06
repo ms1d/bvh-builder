@@ -10,9 +10,8 @@ int main() {
 	std::ifstream input("test.mesh", std::ios::binary);
 	char *buffer = new char[50'000'000];
 
-	input.read(buffer+4, 50'000'000);
-	int len = input.gcount();
-	memcpy(buffer, &len, sizeof(len));
+	input.read(buffer, 50'000'000);
+	long len = input.gcount();
 
 	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
 
@@ -24,6 +23,9 @@ int main() {
 	if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
 		perror("connect"); return 1;
 	}
+
+	char size_buff[4]; memcpy(size_buff, &len, 4);
+	send(fd, size_buff, 4, 0);
 
 	int sent = 0;
 	while (sent < len) {

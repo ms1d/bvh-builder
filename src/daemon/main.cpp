@@ -83,11 +83,22 @@ int main(int argc, char *argv[]) {
 	printf("server ready\n");
 	while (1) {
 		int client_fd = accept(fd, NULL, NULL);
-	
-		size_t n = static_cast<size_t>(read(client_fd, buffer, sizeof(buffer)));
 
-		write(client_fd, buffer, n);
-		build_bvh(buffer+4, output_buffer);
+		char size_buffer[4]; int i = 0;
+
+		while (i < 4) {
+			i += read(client_fd, size_buffer + i, 1);
+		}
+
+		size_t size; memcpy(&size, size_buffer, 4);
+
+		i = 0;
+		while (i < size-4) {
+			i += read(client_fd, buffer + i, size-i-4);
+		}
+
+		std::cout << "starting..." << std::endl;
+		build_bvh(buffer, output_buffer);
 
 		close(client_fd);
 	}
