@@ -30,19 +30,10 @@ void parse_args(int argc, char **argv) {
 			}
 		}
 
-		// masters
-		else if (std::strcmp(arg, "-m") == 0){ 
-			try {
-				masters_count = std::stoi(argv[++i]);
-			} catch (const std::exception &e) {
-				throw std::runtime_error("Number of masters must be a uint!");
-			}
-		}
-
 		// workers per master
 		else if (std::strcmp(arg, "-w") == 0) {
 			try {
-				workers_per_master_count = std::stoi(argv[++i]);
+				worker_count = std::stoi(argv[++i]);
 			} catch (const std::exception &e) {
 				throw std::runtime_error("Number of workers per master must be a uint!");
 			}
@@ -83,30 +74,13 @@ int main(int argc, char *argv[]) {
 	const auto &cmd = std::format("mv {}/baking/* {}/", path_str, path_str);
 	std::system(cmd.c_str());
 
-	thread_pool<build_bvh, std::filesystem::path, master_resource&> master_pool(masters_count);
-	master_resource *resources = new master_resource[masters_count];
-	for (uint i = 0; i < masters_count; i++) {
-		// Never freed since program should run indefinitely
-		resources[i].build_pool = new thread_pool<build_bvh_node, bvh_node*, vec<3>*, std::atomic<uint16_t>&, master_resource&>(workers_per_master_count);
-		resources[i].output_pool = new thread_pool<output_bvh_node, bvh_node*, uint32_t*, char*, uint16_t, master_resource&>(workers_per_master_count);
-	}
-
 	while (true) {
 		for (const auto &entry : std::filesystem::directory_iterator(path)) {
 			if (entry.is_regular_file() && entry.path().extension() == ".mesh") {
-				int index = -1;
-				for (uint i = 0; i < masters_count && index == -1; i++) {
-					if (!resources[i].busy.load()) {
-						resources[i].busy = true;
-						index = i;
-					}
-				}
-
 				const auto &dst = std::filesystem::path(path) / "baking" / entry.path().filename();
 				std::filesystem::copy_file(entry.path(), dst);
-
-				if (index != -1 && master_pool.try_emplace_task(nullptr, dst, resources[index])) std::filesystem::remove(entry.path());
-				else std::filesystem::remove(dst);
+				build_bvh(dst);
+				std::filesystem::remove(entry.path());
 			}
 		}
 
