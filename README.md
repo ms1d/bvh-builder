@@ -3,6 +3,12 @@
 A concurrent BVH builder for path tracing applications
 in c++ to run on little-endian machines.
 
+## Usage (WIP)
+
+- Run the daemon executable (for example using systemd)
+
+- Run the client executable to make requests to the daemon
+
 ## Input Format
 
 - `uint32_t verts_len` (number of elements in `verts`)
