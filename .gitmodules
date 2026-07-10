@@ -10,3 +10,6 @@
 [submodule "lib/veclib"]
 	path = lib/veclib
 	url = git@github.com:ms1d/vec
+[submodule "lib/thread_pool"]
+	path = lib/thread_pool
+	url = git@github.com:ms1d/thread_pool
