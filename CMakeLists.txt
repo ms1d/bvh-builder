@@ -10,7 +10,7 @@ add_executable(bvh-builder ${CLIENT_SRC})
 file(GLOB DAEMON_SRC src/daemon/*.cpp)
 add_executable(bvh-builderd ${DAEMON_SRC})
 
-target_link_libraries(bvh-builderd PRIVATE veclib)
+target_link_libraries(bvh-builderd PRIVATE veclib threadpoollib)
 target_include_directories(bvh-builderd PRIVATE include)
 
 add_subdirectory(lib)
