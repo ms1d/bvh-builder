@@ -18,8 +18,8 @@
 
 
 
-thread_pool<build_bvh_node, bvh_node*, vec<3>*, std::atomic<uint16_t>&> build_pool{worker_count};
-thread_pool<output_bvh_node, bvh_node*, uint32_t*, char*, uint16_t> output_pool{worker_count};
+thread_pool<build_bvh_node> build_pool{worker_count};
+thread_pool<output_bvh_node> output_pool{worker_count};
 
 
 
