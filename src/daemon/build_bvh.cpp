@@ -3,8 +3,9 @@
 #include <cstring>
 #include <atomic>
 #include <iostream>
+#include <tuple>
 #include <unistd.h>
-#include "lf_thread_pool.hpp"
+#include "thread_pool.hpp"
 #include "vec3.cuh"
 #include "parse_mesh.hpp"
 #include "structs.hpp"
@@ -18,8 +19,8 @@
 
 
 
-lf_thread_pool<build_bvh_node, 16, 16> build_pool{};
-lf_thread_pool<output_bvh_node, 16, 16> output_pool{};
+thread_pool<build_bvh_node, 16, 16> build_pool{};
+thread_pool<output_bvh_node, 16, 16> output_pool{};
 
 auto nodes_done = new bvh_node*[1000000];
 std::atomic<uint> nodes_done_index = 0;
@@ -93,10 +94,19 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> *nodes_
 		build_bvh_node(node->right, verts, nodes_len);
 	}
 	else {
-		// BUG: an extra thread is spawned here before all pointers are deleted. find what happens!
-		auto res = build_pool.try_emplace_task(node->left, verts, nodes_len);
+		std::atomic<bool> is_ready = false;
+		tp_task<build_bvh_node> task;
+		task.is_result_ready = &is_ready;
+		task.args = std::make_tuple(node->left, verts, nodes_len);
+
+		auto res = build_pool.try_submit(&task);
+
 		build_bvh_node(node->right, verts, nodes_len);
-		if (res.success) build_pool.await_result(res.index);
+		if (res) {
+			while (!is_ready.load(std::memory_order_acquire)) {
+				if (!build_pool.try_claim()) is_ready.wait(false, std::memory_order_acquire);
+			}
+		}
 		else build_bvh_node(node->left, verts, nodes_len);
 	}
 
@@ -138,9 +148,19 @@ void output_bvh_node(bvh_node *curr_node, uint32_t *root_tris, char *bvh_output_
 			output_bvh_node(curr_node->right, root_tris, bvh_output_buffer, right_index);
 		}
 		else {
-			auto res = output_pool.try_emplace_task(curr_node->left, root_tris, bvh_output_buffer, left_index);
+			std::atomic<bool> is_ready = false;
+			tp_task<output_bvh_node> task;
+			task.is_result_ready = &is_ready;
+			task.args = std::make_tuple(curr_node->left, root_tris, bvh_output_buffer, left_index);
+
+			auto res = output_pool.try_submit(&task);
+
 			output_bvh_node(curr_node->right, root_tris, bvh_output_buffer, right_index);
-			if (res.success) output_pool.await_result(res.index);
+			if (res) {
+				while (!is_ready.load(std::memory_order_acquire)) {
+					if (!output_pool.try_claim()) is_ready.wait(false, std::memory_order_acquire);
+				}
+			}
 			else output_bvh_node(curr_node->left, root_tris, bvh_output_buffer, left_index);
 		}
 	}
