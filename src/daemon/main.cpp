@@ -22,17 +22,8 @@ void parse_args(int argc, char **argv) {
 	for (int i = 1; i < argc; i++) {
 		auto arg = argv[i];
 
-		// number of workers
-		if (std::strcmp(arg, "-w") == 0) {
-			try {
-				worker_count = static_cast<uint>(std::stoi(argv[++i]));
-			} catch (const std::exception &e) {
-				throw std::runtime_error("Number of workers per master must be a uint!");
-			}
-		}
-
 		// sleep period
-		else if (std::strcmp(arg, "-s") == 0) {
+		if (std::strcmp(arg, "-s") == 0) {
 			try {
 				auto tmp = std::stoi(argv[++i]);
 				if (tmp <= 0) tmp = 1;
@@ -40,11 +31,6 @@ void parse_args(int argc, char **argv) {
 			} catch (const std::exception &e) {
 				throw std::runtime_error("Sleep period must be a uint!");
 			}
-		}
-
-		// concurrency
-		else if (std::strcmp(arg, "-c") == 0) {
-			enable_concurrency = false;
 		}
 
 		else throw std::runtime_error("Unrecognized argument! " + std::string(arg));
@@ -90,11 +76,23 @@ int main(int argc, char *argv[]) {
 			i += read(client_fd, size_buffer + i, 1);
 		}
 
-		size_t size; memcpy(&size, size_buffer, 4);
+		uint32_t size; memcpy(&size, size_buffer, 4);
+
+		if (size > BUFFER_SIZE) {
+			close(client_fd);
+			continue;
+		}
 
 		i = 0;
 		while (i < size-4) {
-			i += read(client_fd, buffer + i, size-i-4);
+			auto n = read(client_fd, buffer + i, size-i-4);
+			if (n <= 0) {
+				perror("read");
+				close(client_fd);
+				continue;
+			}
+
+			i += n;
 		}
 
 		std::cout << "starting..." << std::endl;

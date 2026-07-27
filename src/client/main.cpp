@@ -11,7 +11,7 @@ int main() {
 	char *buffer = new char[50'000'000];
 
 	input.read(buffer, 50'000'000);
-	long len = input.gcount();
+	uint32_t len = input.gcount();
 
 	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
 
