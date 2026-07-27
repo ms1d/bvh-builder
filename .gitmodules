@@ -13,3 +13,9 @@
 [submodule "lib/thread_pool"]
 	path = lib/thread_pool
 	url = git@github.com:ms1d/thread_pool
+[submodule "thread-poollib"]
+	path = thread-poollib
+	url = git@github.com:ms1d/thread-poollib
+[submodule "lib/thread-poollib"]
+	path = lib/thread-poollib
+	url = git@github.com:ms1d/thread-poollib
