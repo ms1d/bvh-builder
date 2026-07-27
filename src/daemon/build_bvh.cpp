@@ -94,20 +94,21 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> *nodes_
 		build_bvh_node(node->right, verts, nodes_len);
 	}
 	else {
-		std::atomic<bool> is_ready = false;
-		tp_task<build_bvh_node> task;
-		task.is_result_ready = &is_ready;
-		task.args = std::make_tuple(node->left, verts, nodes_len);
+		// Due to stack re-use during recursion, it is not safe to stack allocate task
+		// Will likely replace with a custom allocator for better performance
+		auto *task = new tp_task<build_bvh_node>;
+		task->args = std::make_tuple(node->left, verts, nodes_len);
 
-		auto res = build_pool.try_submit(&task);
+		auto res = build_pool.try_submit(task);
 
 		build_bvh_node(node->right, verts, nodes_len);
 		if (res) {
-			while (!is_ready.load(std::memory_order_acquire)) {
-				if (!build_pool.try_claim()) is_ready.wait(false, std::memory_order_acquire);
+			while (!task->is_result_ready.load(std::memory_order_acquire)) {
+				if (!build_pool.try_claim()) task->is_result_ready.wait(false, std::memory_order_acquire);
 			}
 		}
 		else build_bvh_node(node->left, verts, nodes_len);
+		delete task;
 	}
 
 	// This node has children so set its tris to nullptr.
@@ -148,20 +149,21 @@ void output_bvh_node(bvh_node *curr_node, uint32_t *root_tris, char *bvh_output_
 			output_bvh_node(curr_node->right, root_tris, bvh_output_buffer, right_index);
 		}
 		else {
-			std::atomic<bool> is_ready = false;
-			tp_task<output_bvh_node> task;
-			task.is_result_ready = &is_ready;
-			task.args = std::make_tuple(curr_node->left, root_tris, bvh_output_buffer, left_index);
+			// Due to stack re-use during recursion, it is not safe to stack allocate task
+			// Will likely replace with a custom allocator for better performance
+			auto *task = new tp_task<output_bvh_node>;
+			task->args = std::make_tuple(curr_node->left, root_tris, bvh_output_buffer, left_index);
 
-			auto res = output_pool.try_submit(&task);
+			auto res = output_pool.try_submit(task);
 
 			output_bvh_node(curr_node->right, root_tris, bvh_output_buffer, right_index);
 			if (res) {
-				while (!is_ready.load(std::memory_order_acquire)) {
-					if (!output_pool.try_claim()) is_ready.wait(false, std::memory_order_acquire);
+				while (!task->is_result_ready.load(std::memory_order_acquire)) {
+					if (!output_pool.try_claim()) task->is_result_ready.wait(false, std::memory_order_acquire);
 				}
 			}
 			else output_bvh_node(curr_node->left, root_tris, bvh_output_buffer, left_index);
+			delete task;
 		}
 	}
 
