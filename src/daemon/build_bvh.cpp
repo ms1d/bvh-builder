@@ -73,8 +73,8 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> *nodes_
 			 rc = verts[*(back)].data[longest_axis] <= mid;
 
 		if (lc) front += 3;
-		if (rc) back  -= 3;
-		if (!(lc | rc)) {
+		else if (rc) back  -= 3;
+		else {
 			uint f0 = front[0], f1 = front[1], f2 = front[2];
 			uint b0 = back[0],  b1 = back[1],  b2 = back[2];
 
