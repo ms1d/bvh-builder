@@ -10,7 +10,7 @@
 
 
 uint sleep_period = 1;
-#define BUFFER_SIZE 50'000'000
+#define BUFFER_SIZE 100'000'000
 
 
 
