@@ -18,7 +18,49 @@ std::filesystem::path path = std::filesystem::current_path();
 
 
 
-int main() {
+void parse_args(int argc, char **argv) {
+	for (int i = 1; i < argc; i++) {
+		auto arg = argv[i];
+
+		// number of workers
+		if (std::strcmp(arg, "-w") == 0) {
+			try {
+				worker_count = static_cast<uint>(std::stoi(argv[++i]));
+			} catch (const std::exception &e) {
+				throw std::runtime_error("Number of workers per master must be a uint!");
+			}
+		}
+
+		// sleep period
+		else if (std::strcmp(arg, "-s") == 0) {
+			try {
+				auto tmp = std::stoi(argv[++i]);
+				if (tmp <= 0) tmp = 1;
+				sleep_period = static_cast<uint>(tmp);
+			} catch (const std::exception &e) {
+				throw std::runtime_error("Sleep period must be a uint!");
+			}
+		}
+
+		// concurrency
+		else if (std::strcmp(arg, "-c") == 0) {
+			enable_concurrency = false;
+		}
+
+		else throw std::runtime_error("Unrecognized argument! " + std::string(arg));
+	}
+}
+
+
+
+int main(int argc, char *argv[]) {
+	try {
+		parse_args(argc, argv);
+	} catch (const std::exception &e) {
+		throw std::runtime_error(e.what());
+		return 1;
+	}
+
 	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	struct sockaddr_un addr;
 	memset(&addr, 0, sizeof(addr));
