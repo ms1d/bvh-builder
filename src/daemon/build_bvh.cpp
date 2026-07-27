@@ -3,7 +3,6 @@
 #include <cstring>
 #include <atomic>
 #include <iostream>
-#include <tuple>
 #include <unistd.h>
 #include "thread_pool.hpp"
 #include "vec3.cuh"
@@ -96,8 +95,7 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> *nodes_
 	else {
 		// Due to stack re-use during recursion, it is not safe to stack allocate task
 		// Will likely replace with a custom allocator for better performance
-		auto *task = new tp_task<build_bvh_node>;
-		task->args = std::make_tuple(node->left, verts, nodes_len);
+		auto *task = new tp_task<build_bvh_node>{node->left, verts, nodes_len};
 
 		auto res = build_pool.try_submit(task);
 
@@ -151,8 +149,7 @@ void output_bvh_node(bvh_node *curr_node, uint32_t *root_tris, char *bvh_output_
 		else {
 			// Due to stack re-use during recursion, it is not safe to stack allocate task
 			// Will likely replace with a custom allocator for better performance
-			auto *task = new tp_task<output_bvh_node>;
-			task->args = std::make_tuple(curr_node->left, root_tris, bvh_output_buffer, left_index);
+			auto *task = new tp_task<output_bvh_node>{curr_node->left, root_tris, bvh_output_buffer, left_index};
 
 			auto res = output_pool.try_submit(task);
 
