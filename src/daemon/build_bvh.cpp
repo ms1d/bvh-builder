@@ -190,11 +190,12 @@ void build_bvh(const char *buffer, char *output_buffer) {
 	parse_mesh(buffer, tris, tris_len, verts, verts_len, max, min);
 	auto e_mesh = std::chrono::high_resolution_clock::now();
 
-	bvh_node root; root.tris = tris; root.tris_len = tris_len; root.max = max; root.min = min;
+	auto *root = new bvh_node{};
+	root->tris = tris; root->tris_len = tris_len; root->max = max; root->min = min;
 	std::atomic<uint16_t> nodes_len = 0;
 
 	auto s_bvh = std::chrono::high_resolution_clock::now();
-	build_bvh_node(&root, verts, &nodes_len);
+	build_bvh_node(root, verts, &nodes_len);
 	auto e_bvh = std::chrono::high_resolution_clock::now();
 
 	auto s_file = std::chrono::high_resolution_clock::now();
@@ -220,7 +221,7 @@ void build_bvh(const char *buffer, char *output_buffer) {
 	// Last use of ptr
 	memcpy(ptr += sizeof(nodes_len), &nodes_len, sizeof(nodes_len));
 	auto s_out = std::chrono::high_resolution_clock::now();
-	output_bvh_node(&root, tris, ptr + sizeof(nodes_len), 0);
+	output_bvh_node(root, tris, ptr + sizeof(nodes_len), 0);
 	auto e_out = std::chrono::high_resolution_clock::now();
 
 
@@ -230,7 +231,7 @@ void build_bvh(const char *buffer, char *output_buffer) {
 	delete[] verts;
 	delete[] tris;
 
-	free_bvh_children(&root);
+	free_bvh_children(root);
 
 	auto e = std::chrono::high_resolution_clock::now();
 
