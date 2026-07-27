@@ -18,8 +18,8 @@
 
 
 
-thread_pool<build_bvh_node, 16, 16> build_pool{};
-thread_pool<output_bvh_node, 16, 16> output_pool{};
+thread_pool<build_bvh_node, 4, 16> build_pool{};
+thread_pool<output_bvh_node, 4, 16> output_pool{};
 
 auto nodes_done = new bvh_node*[1000000];
 std::atomic<uint> nodes_done_index = 0;
