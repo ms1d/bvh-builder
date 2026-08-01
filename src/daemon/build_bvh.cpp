@@ -186,35 +186,21 @@ void build_bvh(const char *buffer, char *output_buffer) {
 	build_bvh_node(root, verts, &nodes_len);
 	auto e_bvh = std::chrono::high_resolution_clock::now();
 
-	auto s_file = std::chrono::high_resolution_clock::now();
-
-	auto t3 = std::chrono::high_resolution_clock::now();
-
-	auto m_file = std::chrono::high_resolution_clock::now();
-
 	// copy verts len, verts, tris len and tris in that order
-	// HOTSPOT!	
 	auto verts_space = verts_len * sizeof(vec<3>),
 		   tris_space = tris_len * sizeof(uint32_t);
 
 	char *ptr = output_buffer;
 	memcpy(ptr, &verts_len, sizeof(verts_len)); ptr += sizeof(verts_len);
 	memcpy(ptr, verts, verts_space); ptr += verts_space;
-	auto t5 = std::chrono::high_resolution_clock::now();
 	memcpy(ptr, &tris_len, sizeof(tris_len)); ptr += sizeof(tris_len);
 	memcpy(ptr, tris, tris_space); ptr += tris_space;
-
-	auto e_file = std::chrono::high_resolution_clock::now();
 
 	// Last use of ptr
 	memcpy(ptr += sizeof(nodes_len), &nodes_len, sizeof(nodes_len));
 	auto s_out = std::chrono::high_resolution_clock::now();
 	output_bvh_node(root, tris, ptr + sizeof(nodes_len), 0);
 	auto e_out = std::chrono::high_resolution_clock::now();
-
-
-	auto s_file2 = std::chrono::high_resolution_clock::now();
-	auto e_file2 = std::chrono::high_resolution_clock::now();
 
 	delete[] verts;
 	delete[] tris;
@@ -237,29 +223,17 @@ void build_bvh(const char *buffer, char *output_buffer) {
 			  << std::chrono::duration_cast<std::chrono::milliseconds>(e_bvh - s_bvh).count()
 			  << "ms\n";
 
-	std::cout << "File copy + remove: "
-			  << std::chrono::duration_cast<std::chrono::milliseconds>(t3 - s_file).count()
-			  << "ms\n";
-
-	std::cout << "File open: "
-			  << std::chrono::duration_cast<std::chrono::milliseconds>(m_file - t3).count()
-			  << "ms\n";
-
-	std::cout << "CPU staging (verts memcpy + tris_len prep): "
-			  << std::chrono::duration_cast<std::chrono::milliseconds>(t5 - m_file).count()
-			  << "ms\n";
-
-	std::cout << "First disk write (verts + tris): "
-			  << std::chrono::duration_cast<std::chrono::milliseconds>(e_file - t5).count()
-			  << "ms\n";
-
 	std::cout << "BVH serialization: "
 			  << std::chrono::duration_cast<std::chrono::milliseconds>(e_out - s_out).count()
 			  << "ms\n";
 
-	std::cout << "Final disk write + close: "
-			  << std::chrono::duration_cast<std::chrono::milliseconds>(e_file2 - s_file2).count()
-			  << "ms\n";
+	double seconds =
+		std::chrono::duration<double>(e_bvh - s_bvh).count();
+
+	double tris_per_second = (tris_len / 3.0) / seconds / 1e6;
+
+	std::cout << "BVH Builder throughput: "
+			  << tris_per_second << "Million tris/s\n";
 
 	std::cout << "======================================\n";
 }
