@@ -78,26 +78,28 @@ int main(int argc, char *argv[]) {
 
 		uint32_t size; memcpy(&size, size_buffer, 4);
 
-		if (size > BUFFER_SIZE) {
-			close(client_fd);
-			continue;
-		}
+		// Need at least:
+		// - 1 verts_len (1 uint32_t = 4 bytes)
+		// - 1 vertex (1 vec<3> = 4 * 3 = 12 bytes)
+		// - 1 tris_len (1 uint32_t = 4 bytes)
+		// - 1 triangle (3 uint32_t = 12 bytes)
+		if (size > BUFFER_SIZE || size < 32) goto discard;
 
 		i = 0;
 		while (i < size-4) {
 			auto n = read(client_fd, buffer + i, size-i-4);
 			if (n <= 0) {
 				perror("read");
-				close(client_fd);
-				continue;
+				goto discard;
 			}
 
 			i += n;
 		}
 
 		std::cout << "starting..." << std::endl;
-		build_bvh(buffer, output_buffer);
+		build_bvh(buffer, output_buffer, size);
 
+discard:
 		close(client_fd);
 	}
 

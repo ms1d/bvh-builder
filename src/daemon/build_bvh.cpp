@@ -168,14 +168,15 @@ void free_bvh_children(bvh_node *node) {
 
 
 
-void build_bvh(const char *buffer, char *output_buffer) {
+void build_bvh(const char *buffer, char *output_buffer, uint32_t size) {
 	auto s = std::chrono::high_resolution_clock::now();
 
 	uint32_t *tris, verts_len, tris_len;
 	vec<3> *verts, max, min;
 
 	auto s_mesh = std::chrono::high_resolution_clock::now();
-	parse_mesh(buffer, tris, tris_len, verts, verts_len, max, min);
+	auto success = parse_mesh(buffer, size, tris, tris_len, verts, verts_len, max, min);
+	if (!success) return; // TODO: add error codes
 	auto e_mesh = std::chrono::high_resolution_clock::now();
 
 	auto *root = new bvh_node{};

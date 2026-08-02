@@ -3,7 +3,7 @@
 
 
 
-void parse_mesh(const char *buffer,
+bool parse_mesh(const char *buffer, uint32_t size, // number of BYTES in data
 		uint32_t *&tris, uint32_t &tris_len,
 		vec<3> *&verts, uint32_t &verts_len,
 		vec<3> &max, vec<3> &min) {
@@ -12,6 +12,10 @@ void parse_mesh(const char *buffer,
 	const char *__restrict ptr = buffer;
 
 	memcpy(&verts_len, ptr, 4);
+
+	// Need at least 1 triangle (3 vertices)
+	// Need verts_len to not be too big (allow space for tris_len)
+	if (verts_len < 3 || verts_len * 12 + 4 >= size - 4) return false;
 
 	verts = new vec<3>[verts_len];
 	ptr += 4;
@@ -44,7 +48,10 @@ void parse_mesh(const char *buffer,
 
 	ptr += 4;
 
+	if ((verts_len + tris_len / 3) * 12 + 8 != size) return false;
+
 	// tris_len = number of elements in tris. each triangle is 3 ints
 	tris = new uint32_t[tris_len];
 	memcpy(tris, ptr, tris_len * 4);
+	return true;
 }
