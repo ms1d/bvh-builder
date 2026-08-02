@@ -234,7 +234,7 @@ void build_bvh(const char *buffer, char *output_buffer, uint32_t size) {
 	double tris_per_second = (tris_len / 3.0) / seconds / 1e6;
 
 	std::cout << "BVH Builder throughput: "
-			  << tris_per_second << "Million tris/s\n";
+			  << tris_per_second << " Million tris/s\n";
 
 	std::cout << "======================================\n";
 }
