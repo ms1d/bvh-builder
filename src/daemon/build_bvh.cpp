@@ -3,6 +3,7 @@
 #include <cstring>
 #include <atomic>
 #include <iostream>
+#include <tuple>
 #include <unistd.h>
 #include "thread_pool.hpp"
 #include "vec3.cuh"
@@ -10,6 +11,7 @@
 #include "structs.hpp"
 #include "build_bvh.hpp"
 #include <immintrin.h>
+#include "bump_pool.hpp"
 
 
 
@@ -20,6 +22,9 @@
 
 thread_pool<build_bvh_node, 4, 16> build_pool{};
 thread_pool<output_bvh_node, 4, 16> output_pool{};
+
+bump_pool<tp_task<build_bvh_node>, 65'536, mp_type::thread_safe> build_memory_pool;
+bump_pool<tp_task<output_bvh_node>, 65'536, mp_type::thread_safe> output_memory_pool;
 
 auto nodes_done = new bvh_node*[1000000];
 std::atomic<uint> nodes_done_index = 0;
@@ -89,8 +94,8 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> *nodes_
 	// 3 - Recurse with 2 new threads, await results
 
 	// Due to stack re-use during recursion, it is not safe to stack allocate task
-	// Will likely replace with a custom allocator for better performance
-	auto *task = new tp_task<build_bvh_node>{node->left, verts, nodes_len};
+	auto task = build_memory_pool.alloc();
+	task->args = std::make_tuple(node->left, verts, nodes_len);
 
 	auto res = build_pool.try_submit(task);
 
@@ -101,7 +106,6 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> *nodes_
 		}
 	}
 	else build_bvh_node(node->left, verts, nodes_len);
-	delete task;
 
 	// This node has children so set its tris to nullptr.
 	// Ignore tris_len in this case
@@ -137,8 +141,8 @@ void output_bvh_node(bvh_node *curr_node, uint32_t *root_tris, char *bvh_output_
 		curr_node_out.payload = (li << 16) | right_index;
 
 		// Due to stack re-use during recursion, it is not safe to stack allocate task
-		// Will likely replace with a custom allocator for better performance
-		auto *task = new tp_task<output_bvh_node>{curr_node->left, root_tris, bvh_output_buffer, left_index};
+		auto task = output_memory_pool.alloc();
+		task->args = std::make_tuple(curr_node->left, root_tris, bvh_output_buffer, left_index);
 
 		auto res = output_pool.try_submit(task);
 
@@ -149,7 +153,6 @@ void output_bvh_node(bvh_node *curr_node, uint32_t *root_tris, char *bvh_output_
 			}
 		}
 		else output_bvh_node(curr_node->left, root_tris, bvh_output_buffer, left_index);
-		delete task;
 	}
 
 	memcpy(bvh_output_buffer + curr_bvh_pos * sizeof(bvh_node_serialised), &curr_node_out, sizeof(bvh_node_serialised));
@@ -207,6 +210,8 @@ void build_bvh(const char *buffer, char *output_buffer, uint32_t size) {
 	delete[] tris;
 
 	free_bvh_children(root);
+	build_memory_pool.free();
+	output_memory_pool.free();
 
 	auto e = std::chrono::high_resolution_clock::now();
 

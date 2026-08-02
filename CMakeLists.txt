@@ -30,7 +30,13 @@ FetchContent_Declare(
 	GIT_TAG main
 )
 
-FetchContent_MakeAvailable(veclib commonlib thread-poollib)
+FetchContent_Declare(
+	memory-poollib
+	GIT_REPOSITORY https://github.com/ms1d/memory-poollib
+	GIT_TAG main
+)
 
-target_link_libraries(bvh-builderd PRIVATE veclib threadpoollib)
+FetchContent_MakeAvailable(veclib commonlib thread-poollib memory-poollib)
+
+target_link_libraries(bvh-builderd PRIVATE veclib thread-poollib memory-poollib)
 target_include_directories(bvh-builderd PRIVATE include)
