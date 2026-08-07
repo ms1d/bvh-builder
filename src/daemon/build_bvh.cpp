@@ -104,8 +104,7 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> *nodes_
 		while (!task->is_result_ready.load(std::memory_order_acquire)) {
 			if (!build_pool.try_claim()) task->is_result_ready.wait(false, std::memory_order_acquire);
 		}
-	}
-	else build_bvh_node(node->left, verts, nodes_len);
+	} else build_bvh_node(node->left, verts, nodes_len);
 
 	// This node has children so set its tris to nullptr.
 	// Ignore tris_len in this case
@@ -125,6 +124,7 @@ void output_bvh_node(bvh_node *curr_node, uint32_t *root_tris, char *bvh_output_
 	curr_node_out.max.x = _cvtss_sh(curr_node->max.x, 0);
 	curr_node_out.max.y = _cvtss_sh(curr_node->max.y, 0);
 	curr_node_out.max.z = _cvtss_sh(curr_node->max.z, 0);
+
 	curr_node_out.min.x = _cvtss_sh(curr_node->min.x, 0);
 	curr_node_out.min.y = _cvtss_sh(curr_node->min.y, 0);
 	curr_node_out.min.z = _cvtss_sh(curr_node->min.z, 0);
@@ -195,15 +195,15 @@ void build_bvh(const char *buffer, char *output_buffer, uint32_t size) {
 		   tris_space = tris_len * sizeof(uint32_t);
 
 	char *ptr = output_buffer;
-	memcpy(ptr, &verts_len, sizeof(verts_len)); ptr += sizeof(verts_len);
-	memcpy(ptr, verts, verts_space); ptr += verts_space;
-	memcpy(ptr, &tris_len, sizeof(tris_len)); ptr += sizeof(tris_len);
-	memcpy(ptr, tris, tris_space); ptr += tris_space;
+	memcpy(ptr, &verts_len, sizeof(verts_len));
+	memcpy(ptr += sizeof(verts_len), verts, verts_space);
+	memcpy(ptr += verts_space, &tris_len, sizeof(tris_len));
+	memcpy(ptr += sizeof(tris_len), tris, tris_space);
 
 	// Last use of ptr
-	memcpy(ptr += sizeof(nodes_len), &nodes_len, sizeof(nodes_len));
+	memcpy(ptr += tris_space, &nodes_len, sizeof(nodes_len));
 	auto s_out = std::chrono::high_resolution_clock::now();
-	output_bvh_node(root, tris, ptr + sizeof(nodes_len), 0);
+	output_bvh_node(root, tris, ptr += sizeof(nodes_len), 0);
 	auto e_out = std::chrono::high_resolution_clock::now();
 
 	delete[] verts;
