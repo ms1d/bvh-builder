@@ -16,8 +16,8 @@ struct bvh_node {
 struct bvh_node_serialised {
 	vec<3, uint16_t> min, max;
 
-	// MSB - is_leaf
+	// LSB - is_leaf
 	// if is_leaf - 31 bits for tris_index
-	// else - 15 bits for left, 16 bits for right
+	// else - 16 bits for left, 15 bits for right
 	uint32_t payload;
 };

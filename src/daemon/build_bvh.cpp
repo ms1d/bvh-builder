@@ -17,14 +17,16 @@
 
 // Max number of elements in tris per child INCLUSIVE
 #define MAX_TRIS 150
+// (MACRO) Asserts that uin32_t x fits in y bits for 0 < y <= 32
+#define ui32_FITS(x, y) assert(x == (x << (32 - y)) >> (32 - y))
 
 
 
 thread_pool<build_bvh_node, 4, 16> build_pool{};
 thread_pool<output_bvh_node, 4, 16> output_pool{};
 
-arena<tp_task<build_bvh_node>, 65'536, mp_type::thread_safe> build_memory_pool;
-arena<tp_task<output_bvh_node>, 65'536, mp_type::thread_safe> output_memory_pool;
+bump_pool<tp_task<build_bvh_node>, 65'536, mp_type::thread_safe> build_memory_pool;
+bump_pool<tp_task<output_bvh_node>, 65'536, mp_type::thread_safe> output_memory_pool;
 
 
 
@@ -83,14 +85,13 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> *nodes_
 	node->right->tris = front; node->right->tris_len = static_cast<uint32_t>(node->tris_len - (front - node->tris));
 	node->left->tris = node->tris; node->left->tris_len = node->tris_len - node->right->tris_len;
 
-	// 3 - Recurse with 2 new threads, await results
+	// 3 - Recurse + await results
 
 	// Due to stack re-use during recursion, it is not safe to stack allocate task
 	auto task = build_memory_pool.alloc();
 	task->args = std::make_tuple(node->left, verts, nodes_len);
 
 	auto res = build_pool.try_submit(task);
-
 	build_bvh_node(node->right, verts, nodes_len);
 	if (res) {
 		while (!task->is_result_ready.load(std::memory_order_acquire)) {
@@ -106,8 +107,7 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> *nodes_
 
 
 
-void output_bvh_node(bvh_node *curr_node, uint32_t *root_tris, char *bvh_output_buffer, uint16_t curr_bvh_pos) {
-	// TODO - assert that all these indices fit in the ranges. For now I assume they do
+void output_bvh_node(bvh_node *curr_node, uint32_t *root_tris, char *bvh_output_buffer, uint32_t curr_bvh_pos) {
 	if (curr_node == nullptr) return;
 
 	bvh_node_serialised curr_node_out;
@@ -121,16 +121,16 @@ void output_bvh_node(bvh_node *curr_node, uint32_t *root_tris, char *bvh_output_
 	curr_node_out.min.y = _cvtss_sh(curr_node->min.y, 0);
 	curr_node_out.min.z = _cvtss_sh(curr_node->min.z, 0);
 
-	if (curr_node->tris != nullptr) { // MSB = is_leaf = 1
-		// Assuming that tris index fits in 31 bits (i.e. MSB = 1)
-		curr_node_out.payload = static_cast<uint32_t>(curr_node->tris - root_tris);
-		curr_node_out.payload |= (1u << 31);
+	if (curr_node->tris != nullptr) { // LSB = is_leaf = 1
+		auto index = static_cast<uint32_t>(curr_node->tris_len);
+	    ui32_FITS(index, 31);	// TODO: replace with better error handling
+		curr_node_out.payload = (index << 1) + 1;
 	}
-	else { // MSB = is_leaf = 0
-		uint16_t left_index = 2 * curr_bvh_pos, right_index = left_index + 1;
-		auto li = static_cast<uint32_t>(left_index);
-		// Assuming that left_index fits in 15 bits (i.e. MSB = 0)
-		curr_node_out.payload = (li << 16) | right_index;
+	else { // LSB = is_leaf = 0
+		uint32_t left_index = 2 * curr_bvh_pos, right_index = left_index + 1;
+		ui32_FITS(left_index, 16); // TODO: replace with better error handling
+		ui32_FITS(left_index, 15); // TODO: replace with better error handling
+		curr_node_out.payload = (left_index << 16) | (right_index << 1);
 
 		// Due to stack re-use during recursion, it is not safe to stack allocate task
 		auto task = output_memory_pool.alloc();
@@ -202,8 +202,8 @@ void build_bvh(const char *buffer, char *output_buffer, uint32_t size) {
 	delete[] tris;
 
 	free_bvh_children(root);
-	//build_memory_pool.free();
-	//output_memory_pool.free();
+	build_memory_pool.free();
+	output_memory_pool.free();
 
 	auto e = std::chrono::high_resolution_clock::now();
 
