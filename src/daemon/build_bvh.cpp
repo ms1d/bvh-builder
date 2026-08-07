@@ -90,6 +90,7 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> *nodes_
 	// Due to stack re-use during recursion, it is not safe to stack allocate task
 	auto task = build_memory_pool.alloc();
 	task->args = std::make_tuple(node->left, verts, nodes_len);
+	task->is_result_ready = false;
 
 	auto res = build_pool.try_submit(task);
 	build_bvh_node(node->right, verts, nodes_len);
@@ -135,6 +136,7 @@ void output_bvh_node(bvh_node *curr_node, uint32_t *root_tris, char *bvh_output_
 		// Due to stack re-use during recursion, it is not safe to stack allocate task
 		auto task = output_memory_pool.alloc();
 		task->args = std::make_tuple(curr_node->left, root_tris, bvh_output_buffer, left_index);
+		task->is_result_ready = false;
 
 		auto res = output_pool.try_submit(task);
 
