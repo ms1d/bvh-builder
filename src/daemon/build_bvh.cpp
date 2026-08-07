@@ -100,7 +100,6 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> *nodes_
 }
 
 
-
 void output_bvh_node(bvh_node *curr_node, uint32_t *root_tris, char *bvh_output_buffer, uint32_t curr_bvh_pos) {
 	if (curr_node == nullptr) return;
 
@@ -143,7 +142,7 @@ void output_bvh_node(bvh_node *curr_node, uint32_t *root_tris, char *bvh_output_
 		else output_bvh_node(curr_node->left, root_tris, bvh_output_buffer, left_index);
 	}
 
-	memcpy(bvh_output_buffer + curr_bvh_pos * sizeof(bvh_node_serialised), &curr_node_out, sizeof(bvh_node_serialised));
+	memcpy(bvh_output_buffer + (curr_bvh_pos-1) * sizeof(bvh_node_serialised), &curr_node_out, sizeof(bvh_node_serialised));
 }
 
 
@@ -191,7 +190,7 @@ void build_bvh(const char *buffer, char *output_buffer, uint32_t size) {
 	// Last use of ptr
 	memcpy(ptr += tris_space, &nodes_len, sizeof(nodes_len));
 	auto s_out = std::chrono::high_resolution_clock::now();
-	output_bvh_node(root, tris, ptr += sizeof(nodes_len), 0);
+	output_bvh_node(root, tris, ptr += sizeof(nodes_len), 1);
 	auto e_out = std::chrono::high_resolution_clock::now();
 
 	delete[] verts;
