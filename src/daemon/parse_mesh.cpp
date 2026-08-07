@@ -1,22 +1,12 @@
 #include "vec3.cuh"
-#include "thread_pool.hpp"
+#include "parse_mesh.hpp"
+#include "pools.hpp"
 #include <algorithm>
 #include <cstring>
 #include <tuple>
 
-#define NUM_THREADS 3
-#define NUM_TASKS 3
 #define SMALL_VERTS_LEN 2'500'000 // TODO: fine tune
 
-
-
-void find_min_max_verts(
-		const vec<3> *verts, const uint32_t len,
-		vec<3> *max_out, vec<3> *min_out
-		);
-
-
-thread_pool<find_min_max_verts, NUM_THREADS, NUM_TASKS> min_max_pool;
 
 
 bool parse_mesh(const char *buffer, uint32_t size, // number of BYTES in data
@@ -44,12 +34,15 @@ bool parse_mesh(const char *buffer, uint32_t size, // number of BYTES in data
 #define TOTAL_WORKERS (NUM_THREADS + 1)
 	vec<3> extreme_verts[2 * TOTAL_WORKERS];
 	vec<3> *maxes = extreme_verts, *mins = maxes + TOTAL_WORKERS;
-	tp_task<find_min_max_verts> tasks[NUM_THREADS];
-	auto thread_len = verts_len / (TOTAL_WORKERS);
+	
+	tp_task<wrapper> tasks[NUM_THREADS];
+	find_min_max_verts_args args[NUM_THREADS];
+	const uint32_t thread_len = verts_len / (TOTAL_WORKERS);
 
 	for (uint32_t i = 0; i < NUM_THREADS; i++) {
-		tasks[i].args = std::make_tuple(verts + i * thread_len, thread_len, maxes + i, mins + i);
-		min_max_pool.submit(tasks + i);
+		args[i] = find_min_max_verts_args(verts + i * thread_len, thread_len, maxes + i, mins + i);
+		tasks[i].args = std::make_tuple(WRAPPER_TYPE_FIND, static_cast<void*>(&args));
+		worker_pool.submit(tasks + i);
 	}
 
 	find_min_max_verts(verts + NUM_THREADS * thread_len, thread_len + verts_len % (TOTAL_WORKERS), maxes + NUM_THREADS, mins + NUM_THREADS);
@@ -77,7 +70,7 @@ bool parse_mesh(const char *buffer, uint32_t size, // number of BYTES in data
 
 
 void find_min_max_verts(
-		const vec<3> *verts, const uint32_t len,
+		vec<3> *verts, uint32_t len,
 		vec<3> *max_out, vec<3> *min_out
 		) {
 

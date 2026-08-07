@@ -6,12 +6,11 @@
 #include <tuple>
 #include <unistd.h>
 #include <immintrin.h>
-#include "thread_pool.hpp"
 #include "vec3.cuh"
 #include "parse_mesh.hpp"
 #include "structs.hpp"
 #include "build_bvh.hpp"
-#include "arena_pool.hpp"
+#include "pools.hpp"
 
 
 
@@ -20,13 +19,6 @@
 // (MACRO) Asserts that uin32_t x fits in y bits for 0 < y <= 32
 #define ui32_FITS(x, y) assert(x == (x << (32 - y)) >> (32 - y))
 
-
-
-thread_pool<build_bvh_node, 4, 16> build_pool{};
-thread_pool<output_bvh_node, 4, 16> output_pool{};
-
-bump_pool<tp_task<build_bvh_node>, 65'536, mp_type::thread_safe> build_memory_pool;
-bump_pool<tp_task<output_bvh_node>, 65'536, mp_type::thread_safe> output_memory_pool;
 
 
 
@@ -88,15 +80,16 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> *nodes_
 	// 3 - Recurse + await results
 
 	// Due to stack re-use during recursion, it is not safe to stack allocate task
-	auto task = build_memory_pool.alloc();
-	task->args = std::make_tuple(node->left, verts, nodes_len);
+	auto task = memory_pool.alloc();
+	auto args = build_bvh_node_args{ node->left, verts, nodes_len };
+	task->args = std::make_tuple(WRAPPER_TYPE_BUILD, static_cast<void*>(&args));
 	task->is_result_ready = false;
 
-	auto res = build_pool.try_submit(task);
+	auto res = worker_pool.try_submit(task);
 	build_bvh_node(node->right, verts, nodes_len);
 	if (res) {
 		while (!task->is_result_ready.load(std::memory_order_acquire)) {
-			if (!build_pool.try_claim()) task->is_result_ready.wait(false, std::memory_order_acquire);
+			if (!worker_pool.try_claim()) task->is_result_ready.wait(false, std::memory_order_acquire);
 		}
 	} else build_bvh_node(node->left, verts, nodes_len);
 
@@ -134,16 +127,17 @@ void output_bvh_node(bvh_node *curr_node, uint32_t *root_tris, char *bvh_output_
 		curr_node_out.payload = (left_index << 16) | (right_index << 1);
 
 		// Due to stack re-use during recursion, it is not safe to stack allocate task
-		auto task = output_memory_pool.alloc();
-		task->args = std::make_tuple(curr_node->left, root_tris, bvh_output_buffer, left_index);
+		auto task = memory_pool.alloc();
+		auto args = output_bvh_node_args{ curr_node->left, root_tris, bvh_output_buffer, left_index };
+		task->args = std::make_tuple(WRAPPER_TYPE_OUTPUT, static_cast<void*>(&args));
 		task->is_result_ready = false;
 
-		auto res = output_pool.try_submit(task);
+		auto res = worker_pool.try_submit(task);
 
 		output_bvh_node(curr_node->right, root_tris, bvh_output_buffer, right_index);
 		if (res) {
 			while (!task->is_result_ready.load(std::memory_order_acquire)) {
-				if (!output_pool.try_claim()) task->is_result_ready.wait(false, std::memory_order_acquire);
+				if (!worker_pool.try_claim()) task->is_result_ready.wait(false, std::memory_order_acquire);
 			}
 		}
 		else output_bvh_node(curr_node->left, root_tris, bvh_output_buffer, left_index);
@@ -204,8 +198,7 @@ void build_bvh(const char *buffer, char *output_buffer, uint32_t size) {
 	delete[] tris;
 
 	free_bvh_children(root);
-	build_memory_pool.free();
-	output_memory_pool.free();
+	memory_pool.free();
 
 	auto e = std::chrono::high_resolution_clock::now();
 
