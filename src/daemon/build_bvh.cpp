@@ -5,12 +5,12 @@
 #include <iostream>
 #include <tuple>
 #include <unistd.h>
+#include <immintrin.h>
 #include "thread_pool.hpp"
 #include "vec3.cuh"
 #include "parse_mesh.hpp"
 #include "structs.hpp"
 #include "build_bvh.hpp"
-#include <immintrin.h>
 #include "bump_pool.hpp"
 
 
