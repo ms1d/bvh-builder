@@ -11,7 +11,7 @@
 #include "parse_mesh.hpp"
 #include "structs.hpp"
 #include "build_bvh.hpp"
-#include "bump_pool.hpp"
+#include "arena_pool.hpp"
 
 
 
@@ -23,11 +23,8 @@
 thread_pool<build_bvh_node, 4, 16> build_pool{};
 thread_pool<output_bvh_node, 4, 16> output_pool{};
 
-bump_pool<tp_task<build_bvh_node>, 65'536, mp_type::thread_safe> build_memory_pool;
-bump_pool<tp_task<output_bvh_node>, 65'536, mp_type::thread_safe> output_memory_pool;
-
-auto nodes_done = new bvh_node*[1000000];
-std::atomic<uint> nodes_done_index = 0;
+arena<tp_task<build_bvh_node>, 65'536, mp_type::thread_safe> build_memory_pool;
+arena<tp_task<output_bvh_node>, 65'536, mp_type::thread_safe> output_memory_pool;
 
 
 
@@ -45,11 +42,6 @@ void find_min_max_verts(vec<3> *verts, uint32_t *tris, uint32_t len, vec<3> &out
 
 
 void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> *nodes_len) {
-	auto local = nodes_done_index.load(std::memory_order_acquire);
-	while (!nodes_done_index.compare_exchange_strong(local, local + 1, std::memory_order_acq_rel, std::memory_order_relaxed)) {
-		local = nodes_done_index.load(std::memory_order_acquire);
-	}
-	nodes_done[local] = node;
 	// If node has few tris, do not recurse; return to caller
 	if (node->tris_len <= MAX_TRIS) { nodes_len->fetch_add(1, std::memory_order_relaxed); return; }
 
@@ -210,8 +202,8 @@ void build_bvh(const char *buffer, char *output_buffer, uint32_t size) {
 	delete[] tris;
 
 	free_bvh_children(root);
-	build_memory_pool.free();
-	output_memory_pool.free();
+	//build_memory_pool.free();
+	//output_memory_pool.free();
 
 	auto e = std::chrono::high_resolution_clock::now();
 
