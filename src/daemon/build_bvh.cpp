@@ -129,7 +129,7 @@ void output_bvh_node(bvh_node *curr_node, uint32_t *root_tris, char *bvh_output_
 	else { // LSB = is_leaf = 0
 		uint32_t left_index = 2 * curr_bvh_pos, right_index = left_index + 1;
 		ui32_FITS(left_index, 16); // TODO: replace with better error handling
-		ui32_FITS(left_index, 15); // TODO: replace with better error handling
+		ui32_FITS(right_index, 15); // TODO: replace with better error handling
 		curr_node_out.payload = (left_index << 16) | (right_index << 1);
 
 		// Due to stack re-use during recursion, it is not safe to stack allocate task
