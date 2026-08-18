@@ -23,7 +23,8 @@ struct output_bvh_node_args {
 	bvh_node *curr_node;
 	uint32_t *root_tris;
 	char *output_buffer;
-	uint32_t curr_bvh_pos;
+	std::atomic<uint32_t> *curr_bvh_pos;
+	uint32_t curr_node_index;
 };
 
 // The function of `parse_mesh.cpp`, not "build_bvh.cpp"
@@ -44,7 +45,7 @@ inline void wrapper(int type, void *data) {
 		}
 		case WRAPPER_TYPE_OUTPUT: {
 			auto args = static_cast<output_bvh_node_args*>(data);
-			output_bvh_node(args->curr_node, args->root_tris, args->output_buffer, args->curr_bvh_pos);
+			output_bvh_node(args->curr_node, args->root_tris, args->output_buffer, args->curr_bvh_pos, args->curr_node_index);
 			break;
 		}
 		case WRAPPER_TYPE_FIND: {

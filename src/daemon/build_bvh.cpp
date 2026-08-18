@@ -16,6 +16,7 @@
 
 // Max number of elements in tris per child INCLUSIVE
 #define MAX_TRIS 150
+
 // (MACRO) Asserts that uin32_t x fits in y bits for 0 < y <= 32
 #define ui32_FITS(x, y) assert(x == (x << (32 - y)) >> (32 - y))
 
@@ -100,7 +101,7 @@ void build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> *nodes_
 }
 
 
-void output_bvh_node(bvh_node *curr_node, uint32_t *root_tris, char *bvh_output_buffer, uint32_t curr_bvh_pos) {
+void output_bvh_node(bvh_node *curr_node, uint32_t *root_tris, char *bvh_output_buffer, std::atomic<uint32_t> *curr_bvh_pos, uint32_t curr_node_index) {
 	if (curr_node == nullptr) return;
 
 	bvh_node_serialised curr_node_out;
@@ -120,29 +121,31 @@ void output_bvh_node(bvh_node *curr_node, uint32_t *root_tris, char *bvh_output_
 		curr_node_out.payload = (index << 1) + 1;
 	}
 	else { // LSB = is_leaf = 0
-		uint32_t left_index = 2 * curr_bvh_pos, right_index = left_index + 1;
+		const auto curr_bvh_pos_old = curr_bvh_pos->fetch_add(2);
+		uint32_t left_index = curr_bvh_pos_old + 1, right_index = curr_bvh_pos_old + 2;
+
 		ui32_FITS(left_index, 16); // TODO: replace with better error handling
 		ui32_FITS(right_index, 15); // TODO: replace with better error handling
 		curr_node_out.payload = (left_index << 16) | (right_index << 1);
 
 		// Due to stack re-use during recursion, it is not safe to stack allocate task
 		auto task = memory_pool.alloc();
-		auto args = output_bvh_node_args{ curr_node->left, root_tris, bvh_output_buffer, left_index };
+		auto args = output_bvh_node_args{ curr_node->left, root_tris, bvh_output_buffer, curr_bvh_pos, left_index };
 		task->args = std::make_tuple(WRAPPER_TYPE_OUTPUT, static_cast<void*>(&args));
 		task->is_result_ready = false;
 
 		auto res = worker_pool.try_submit(task);
 
-		output_bvh_node(curr_node->right, root_tris, bvh_output_buffer, right_index);
+		output_bvh_node(curr_node->right, root_tris, bvh_output_buffer, curr_bvh_pos, right_index);
 		if (res) {
 			while (!task->is_result_ready.load(std::memory_order_acquire)) {
 				if (!worker_pool.try_claim()) task->is_result_ready.wait(false, std::memory_order_acquire);
 			}
 		}
-		else output_bvh_node(curr_node->left, root_tris, bvh_output_buffer, left_index);
+		else output_bvh_node(curr_node->left, root_tris, bvh_output_buffer, curr_bvh_pos, left_index);
 	}
 
-	memcpy(bvh_output_buffer + (curr_bvh_pos-1) * sizeof(bvh_node_serialised), &curr_node_out, sizeof(bvh_node_serialised));
+	memcpy(bvh_output_buffer + (curr_node_index) * sizeof(bvh_node_serialised), &curr_node_out, sizeof(bvh_node_serialised));
 }
 
 
@@ -190,7 +193,8 @@ void build_bvh(const char *buffer, char *output_buffer, uint32_t size) {
 	// Last use of ptr
 	memcpy(ptr += tris_space, &nodes_len, sizeof(nodes_len));
 	auto s_out = std::chrono::high_resolution_clock::now();
-	output_bvh_node(root, tris, ptr += sizeof(nodes_len), 1);
+	std::atomic<uint32_t> curr_bvh_pos = 0;
+	output_bvh_node(root, tris, ptr += sizeof(nodes_len), &curr_bvh_pos, 0);
 	auto e_out = std::chrono::high_resolution_clock::now();
 
 	delete[] verts;
