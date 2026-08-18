@@ -1,7 +1,6 @@
 #include "vec3.cuh"
 #include "parse_mesh.hpp"
 #include "pools.hpp"
-#include <algorithm>
 #include <cstring>
 #include <tuple>
 
@@ -41,8 +40,8 @@ bool parse_mesh(const char *buffer, uint32_t size, // number of BYTES in data
 
 	for (uint32_t i = 0; i < NUM_THREADS; i++) {
 		args[i] = find_min_max_verts_args(verts + i * thread_len, thread_len, maxes + i, mins + i);
-		tasks[i].args = std::make_tuple(WRAPPER_TYPE_FIND, static_cast<void*>(&args));
-		worker_pool.submit(tasks + i);
+		tasks[i].args = std::make_tuple(WRAPPER_TYPE_FIND, static_cast<void*>(args + i));
+		worker_pool.try_submit(tasks + i);
 	}
 
 	find_min_max_verts(verts + NUM_THREADS * thread_len, thread_len + verts_len % (TOTAL_WORKERS), maxes + NUM_THREADS, mins + NUM_THREADS);
