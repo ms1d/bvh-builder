@@ -1,6 +1,5 @@
 #include <cstring>
 #include <filesystem>
-#include <stdexcept>
 #include <unistd.h>
 #include "build_bvh.hpp"
 #include <sys/socket.h>
