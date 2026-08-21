@@ -161,14 +161,14 @@ void free_bvh_children(bvh_node *node) {
 
 
 
-void build_bvh(const char *buffer, char *output_buffer, uint32_t size) {
+void build_bvh(const char *buffer, char *output_buffer, const uint32_t size_in, uint32_t *size_out) {
 	auto s = std::chrono::high_resolution_clock::now();
 
 	uint32_t *tris, verts_len, tris_len;
 	vec<3> *verts, max, min;
 
 	auto s_mesh = std::chrono::high_resolution_clock::now();
-	auto success = parse_mesh(buffer, size, tris, tris_len, verts, verts_len, max, min);
+	auto success = parse_mesh(buffer, size_in, tris, tris_len, verts, verts_len, max, min);
 	if (!success) return; // TODO: add error codes
 	auto e_mesh = std::chrono::high_resolution_clock::now();
 
@@ -180,22 +180,15 @@ void build_bvh(const char *buffer, char *output_buffer, uint32_t size) {
 	build_bvh_node(root, verts, &nodes_len);
 	auto e_bvh = std::chrono::high_resolution_clock::now();
 
-	// copy verts len, verts, tris len and tris in that order
-	auto verts_space = verts_len * sizeof(vec<3>),
-		   tris_space = tris_len * sizeof(uint32_t);
-
 	char *ptr = output_buffer;
-	memcpy(ptr, &verts_len, sizeof(verts_len));
-	memcpy(ptr += sizeof(verts_len), verts, verts_space);
-	memcpy(ptr += verts_space, &tris_len, sizeof(tris_len));
-	memcpy(ptr += sizeof(tris_len), tris, tris_space);
 
 	// Last use of ptr
-	memcpy(ptr += tris_space, &nodes_len, sizeof(nodes_len));
+	memcpy(ptr, &nodes_len, sizeof(nodes_len));
 	auto s_out = std::chrono::high_resolution_clock::now();
 	std::atomic<uint32_t> curr_bvh_pos = 0;
-	output_bvh_node(root, tris, ptr += sizeof(nodes_len), &curr_bvh_pos, 0);
+	output_bvh_node(root, tris, ptr + sizeof(nodes_len), &curr_bvh_pos, 0);
 	auto e_out = std::chrono::high_resolution_clock::now();
+	*size_out = sizeof(nodes_len) + nodes_len * sizeof(bvh_node_serialised);
 
 	delete[] verts;
 	delete[] tris;

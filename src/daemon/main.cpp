@@ -9,8 +9,8 @@
 
 
 
-uint sleep_period = 1;
-#define BUFFER_SIZE 100'000'000
+#define BUFFER_IN_SIZE 100'000'000
+#define BUFFER_OUT_SIZE 100'000'000
 
 
 
@@ -18,35 +18,7 @@ std::filesystem::path path = std::filesystem::current_path();
 
 
 
-void parse_args(int argc, char **argv) {
-	for (int i = 1; i < argc; i++) {
-		auto arg = argv[i];
-
-		// sleep period
-		if (std::strcmp(arg, "-s") == 0) {
-			try {
-				auto tmp = std::stoi(argv[++i]);
-				if (tmp <= 0) tmp = 1;
-				sleep_period = static_cast<uint>(tmp);
-			} catch (const std::exception &e) {
-				throw std::runtime_error("Sleep period must be a uint!");
-			}
-		}
-
-		else throw std::runtime_error("Unrecognized argument! " + std::string(arg));
-	}
-}
-
-
-
-int main(int argc, char *argv[]) {
-	try {
-		parse_args(argc, argv);
-	} catch (const std::exception &e) {
-		throw std::runtime_error(e.what());
-		return 1;
-	}
-
+int main(void) {
 	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	struct sockaddr_un addr;
 	memset(&addr, 0, sizeof(addr));
@@ -63,42 +35,54 @@ int main(int argc, char *argv[]) {
 		perror("listen"); return 1;
 	}
 
-	char *buffer = new char[BUFFER_SIZE], *output_buffer = new char[BUFFER_SIZE];
+	char *buffer = new char[BUFFER_IN_SIZE], *output_buffer = new char[BUFFER_OUT_SIZE];
 
 	printf("server ready\n");
 	while (1) {
 		int client_fd = accept(fd, NULL, NULL);
 
-		char size_buffer[4]; int i = 0;
+		char size_buffer[4]; int read_bytes = 0;
 
-		while (i < 4) {
-			i += read(client_fd, size_buffer + i, 1);
+		while (read_bytes < 4) {
+			auto tmp = read(client_fd, size_buffer + read_bytes, 4 - read_bytes);
+			if (tmp <= 0) { close(client_fd); continue; }
+			read_bytes += tmp;
 		}
 
-		uint32_t size; memcpy(&size, size_buffer, 4);
+		uint32_t size_in, size_out; memcpy(&size_in, size_buffer, 4);
 
 		// Need at least:
 		// - 1 verts_len (1 uint32_t = 4 bytes)
 		// - 1 vertex (1 vec<3> = 4 * 3 = 12 bytes)
 		// - 1 tris_len (1 uint32_t = 4 bytes)
 		// - 1 triangle (3 uint32_t = 12 bytes)
-		if (size > BUFFER_SIZE || size < 32) goto discard;
+		if (size_in > BUFFER_IN_SIZE || size_in < 32) { close(client_fd); continue; };
 
-		i = 0;
-		while (i < size-4) {
-			auto n = read(client_fd, buffer + i, size-i-4);
-			if (n <= 0) {
-				perror("read");
-				goto discard;
-			}
+		printf("size fine\n");
 
-			i += n;
+		read_bytes = 0;
+		while (read_bytes < size_in) {
+			auto tmp = read(client_fd, buffer + read_bytes, size_in - read_bytes);
+			if (tmp <= 0) { printf("here\n"); perror("read"); close(client_fd); continue; }
+
+			read_bytes += tmp;
 		}
 
-		build_bvh(buffer, output_buffer, size);
+		build_bvh(buffer, output_buffer, size_in, &size_out);
 
-discard:
-		close(client_fd);
+		int send_bytes = 0;
+		while (send_bytes < 4) {
+			auto tmp = send(client_fd, &size_out + send_bytes, 4 - send_bytes, 0);
+			if (tmp <= 0) { perror("send"); close(client_fd); continue; }
+			send_bytes += tmp;
+		}
+
+		send_bytes = 0;
+		while (send_bytes < size_out) {
+            auto tmp = send(client_fd, output_buffer + send_bytes, size_out - send_bytes, 0);
+            if (tmp <= 0) { perror("send"); close(client_fd); continue; }
+			send_bytes += tmp;
+		}
 	}
 
 	delete[] buffer;

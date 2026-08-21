@@ -11,7 +11,8 @@ int main() {
 	char *buffer = new char[50'000'000];
 
 	input.read(buffer, 50'000'000);
-	uint32_t len = input.gcount();
+	long len = input.gcount();
+	if (len > 50'000'000) return 1;
 
 	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
 
@@ -36,6 +37,23 @@ int main() {
 		sent += curr_send;
 	}
 
+	int read_bytes = 0;
+    uint32_t size_in;
+    while (read_bytes < 4) {
+        auto tmp = read(fd, &size_in + read_bytes, 4 - read_bytes);
+        if (tmp < 0) { close(fd); return 1; }
+        read_bytes += tmp;
+    }
+
+	read_bytes = 0;
+	char *output_buffer = new char[size_in];
+	while (read_bytes < size_in) {
+		auto tmp = read(fd, output_buffer + read_bytes, size_in - read_bytes);
+		if (read_bytes < 0) { close(fd); return 1; }
+        read_bytes += tmp;
+    }
+
+	delete[] output_buffer;
 	delete[] buffer;
 
     return 0;
