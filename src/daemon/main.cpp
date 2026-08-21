@@ -65,7 +65,6 @@ int main(int argc, char *argv[]) {
 
 	char *buffer = new char[BUFFER_SIZE], *output_buffer = new char[BUFFER_SIZE];
 
-	perror("bind/listen/accept");
 	printf("server ready\n");
 	while (1) {
 		int client_fd = accept(fd, NULL, NULL);
@@ -96,7 +95,6 @@ int main(int argc, char *argv[]) {
 			i += n;
 		}
 
-		std::cout << "starting..." << std::endl;
 		build_bvh(buffer, output_buffer, size);
 
 discard:
