@@ -58,8 +58,6 @@ int main(void) {
 		// - 1 triangle (3 uint32_t = 12 bytes)
 		if (size_in > BUFFER_IN_SIZE || size_in < 32) { close(client_fd); continue; };
 
-		printf("size fine\n");
-
 		read_bytes = 0;
 		while (read_bytes < size_in) {
 			auto tmp = read(client_fd, buffer + read_bytes, size_in - read_bytes);
