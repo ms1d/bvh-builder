@@ -62,7 +62,7 @@ inline void wrapper(int type, void *data) {
 
 #define NUM_THREADS 4
 #define NUM_TASKS 16
-inline thread_pool<wrapper, 4, 16, pool_type::vyukov_buffer_spin> worker_pool{};
+inline thread_pool<wrapper, NUM_THREADS, NUM_TASKS, pool_type::vyukov_buffer_spin> worker_pool{};
 
 #define POOL_SIZE 131'072
 inline bump_pool<tp_task<wrapper>, POOL_SIZE, mp_type::thread_safe> memory_pool{};
