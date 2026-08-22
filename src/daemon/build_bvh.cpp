@@ -162,32 +162,54 @@ void free_bvh_children(bvh_node *node) {
 
 
 void build_bvh(const char *buffer, char *output_buffer, const uint32_t size_in, uint32_t *size_out) {
+#ifndef NDEBUG
 	auto s = std::chrono::high_resolution_clock::now();
+#endif
 
 	uint32_t *tris, verts_len, tris_len;
 	vec<3> *verts, max, min;
 
+#ifndef NDEBUG
 	auto s_mesh = std::chrono::high_resolution_clock::now();
+#endif
+
 	auto success = parse_mesh(buffer, size_in, tris, tris_len, verts, verts_len, max, min);
 	if (!success) return; // TODO: add error codes
+
+#ifndef NDEBUG
 	auto e_mesh = std::chrono::high_resolution_clock::now();
+#endif
 
 	auto *root = new bvh_node{};
 	root->tris = tris; root->tris_len = tris_len; root->max = max; root->min = min;
 	std::atomic<uint16_t> nodes_len = 0;
 
+#ifndef NDEBUG
 	auto s_bvh = std::chrono::high_resolution_clock::now();
+#endif
+
 	build_bvh_node(root, verts, &nodes_len);
+
+#ifndef NDEBUG
 	auto e_bvh = std::chrono::high_resolution_clock::now();
+#endif
 
 	char *ptr = output_buffer;
 
 	// Last use of ptr
 	memcpy(ptr, &nodes_len, sizeof(nodes_len));
+
+#ifndef NDEBUG
 	auto s_out = std::chrono::high_resolution_clock::now();
+#endif
+
 	std::atomic<uint32_t> curr_bvh_pos = 0;
 	output_bvh_node(root, tris, ptr + sizeof(nodes_len), &curr_bvh_pos, 0);
+
+#ifndef NDEBUG
 	auto e_out = std::chrono::high_resolution_clock::now();
+#endif
+
 	*size_out = sizeof(nodes_len) + nodes_len * sizeof(bvh_node_serialised);
 
 	delete[] verts;
@@ -196,8 +218,11 @@ void build_bvh(const char *buffer, char *output_buffer, const uint32_t size_in, 
 	free_bvh_children(root);
 	memory_pool.free();
 
+#ifndef NDEBUG
 	auto e = std::chrono::high_resolution_clock::now();
+#endif
 
+#ifndef NDEBUG
 	std::cout << "\n========== BVH BUILD PROFILE ==========\n";
 
 	std::cout << "Total time: "
@@ -225,4 +250,5 @@ void build_bvh(const char *buffer, char *output_buffer, const uint32_t size_in, 
 			  << tris_per_second << " Million tris/s\n";
 
 	std::cout << "======================================\n";
+#endif
 }
