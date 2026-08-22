@@ -40,3 +40,4 @@ FetchContent_MakeAvailable(veclib commonlib thread-poollib memory-poollib)
 
 target_link_libraries(bvh-builderd PRIVATE veclib thread-poollib memory-poollib)
 target_include_directories(bvh-builderd PRIVATE include)
+target_include_directories(bvh-builder PRIVATE include)
