@@ -1,19 +1,25 @@
-#include <fstream>
-#include <iostream>
+#include <cstdint>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <cstdio>
 
 
 
 int main() {
-	std::ifstream input("test.mesh", std::ios::binary);
-	char *buffer = new char[50'000'000];
+	int file_fd = open("./test.mesh", O_RDONLY);
+	if (file_fd < 0) { printf("Couldn't find file\n"); return -1; }
 
-	input.read(buffer, 50'000'000);
-	long len = input.gcount();
-	if (len > 50'000'000) return 1;
+	struct stat s;
 
+	fstat(file_fd, &s);
+	long len = s.st_size;
+	if (len > 50'000'000) { printf("Length of file too long\n"); return 1; }
+
+	char *buffer = (char*)mmap(0, len, PROT_READ, MAP_PRIVATE, file_fd, 0);
 #ifndef NDEBUG
 	printf("client: len valid\n");
 #endif
@@ -86,7 +92,6 @@ int main() {
 		err = *(uint32_t*)output_buffer;
 	
 	delete[] output_buffer;
-	delete[] buffer;
 
 	close(fd);
     
