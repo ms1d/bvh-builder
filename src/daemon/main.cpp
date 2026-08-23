@@ -114,7 +114,10 @@ int main(void) {
 		printf("server: client data read\n");
 #endif
 
-		build_bvh(buffer, output_buffer, size_in, &size_out);
+		int bvh_res = build_bvh(buffer, output_buffer, size_in, &size_out);
+		if (bvh_res < 0) {
+			send_err(client_fd, static_cast<uint32_t>(-bvh_res)); continue;
+		}
 
 		int send_bytes = 0;
 		{

@@ -1,6 +1,7 @@
 #include "vec3.cuh"
 #include "parse_mesh.hpp"
 #include "pools.hpp"
+#include "codes.hpp"
 #include <cstring>
 #include <tuple>
 
@@ -8,7 +9,7 @@
 
 
 
-bool parse_mesh(const char *buffer, const uint32_t size, // number of BYTES in data
+int parse_mesh(const char *buffer, const uint32_t size, // number of BYTES in data
 		uint32_t *&tris, uint32_t &tris_len,
 		vec<3> *&verts, uint32_t &verts_len,
 		vec<3> &max, vec<3> &min) {
@@ -20,7 +21,7 @@ bool parse_mesh(const char *buffer, const uint32_t size, // number of BYTES in d
 
 	// Need at least 1 triangle (3 vertices)
 	// Need verts_len to not be too big (allow space for tris_len)
-	if (verts_len < 3 || verts_len * sizeof(vec<3>) + sizeof(tris_len) >= size - sizeof(verts_len)) return false;
+	if (verts_len < 3 || verts_len * sizeof(vec<3>) + sizeof(tris_len) >= size - sizeof(verts_len)) return -ERR_PARSE_VERTS_LEN;
 
 	verts = new vec<3>[verts_len];
 	ptr += sizeof(verts_len);
@@ -59,7 +60,7 @@ bool parse_mesh(const char *buffer, const uint32_t size, // number of BYTES in d
 
 	ptr += 4;
 
-	if ((verts_len + tris_len / 3) * 12 + 8 != size) return false;
+	if ((verts_len + tris_len / 3) * 12 + 8 != size) return -ERR_PARSE_SIZE;
 
 	// tris_len = number of elements in tris. each triangle is 3 ints
 	tris = new uint32_t[tris_len];
