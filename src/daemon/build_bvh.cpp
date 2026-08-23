@@ -209,7 +209,6 @@ int build_bvh(const char *buffer, char *output_buffer, const uint32_t size_in, u
 	if (success < 0) { cleanup(nullptr, verts, tris); return success; }
 
 #ifndef NDEBUG
-	printf("Data has %u tris\n", tris_len / 3);
 	auto e_mesh = std::chrono::high_resolution_clock::now();
 #endif
 
@@ -222,7 +221,6 @@ int build_bvh(const char *buffer, char *output_buffer, const uint32_t size_in, u
 #endif
 
 	success = build_bvh_node(root, verts, &nodes_len);
-	printf("build returned\n");
 	if (success < 0) { cleanup(root, verts, tris); return success; }
 
 #ifndef NDEBUG
@@ -240,7 +238,6 @@ int build_bvh(const char *buffer, char *output_buffer, const uint32_t size_in, u
 
 	std::atomic<uint32_t> curr_bvh_pos = 0;
 	success = output_bvh_node(root, tris, ptr + sizeof(nodes_len), &curr_bvh_pos, 0);
-	printf("output returned\n");
 	if (success < 0) { cleanup(root, verts, tris); return success; }
 
 #ifndef NDEBUG
