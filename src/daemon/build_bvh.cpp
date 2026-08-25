@@ -99,6 +99,8 @@ int build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> *nodes_l
 			while (!tasks[i].is_result_ready.load(std::memory_order_acquire)) {
 				if (!worker_pool.try_claim()) tasks[i].is_result_ready.wait(false, std::memory_order_acquire);
 			}
+
+			errs[i] = tasks[i].result;
 		} else {
 			errs[i] = build_bvh_node(node->children[i], verts, nodes_len);
 		}
@@ -169,6 +171,7 @@ int output_bvh_node(bvh_node *curr_node, vec<3, uint32_t> *root_tris, char *bvh_
 			if (results[i]) {
 				while (!tasks[i].is_result_ready.load(std::memory_order_acquire)) {
 					if (!worker_pool.try_claim()) tasks[i].is_result_ready.wait(false, std::memory_order_acquire);
+					errs[i] = tasks[i].result;
 				}
 			} else {
 				errs[i] = output_bvh_node(curr_node->children[i], root_tris, bvh_output_buffer, curr_bvh_pos, left_index + i);
