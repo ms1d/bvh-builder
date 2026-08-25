@@ -17,7 +17,7 @@ int main() {
 
 	fstat(file_fd, &s);
 	long len = s.st_size;
-	if (len > 50'000'000) { printf("Length of file too long\n"); return 1; }
+	if (len > 100'000'000) { printf("Length of file too long\n"); return 1; }
 
 	char *buffer = (char*)mmap(0, len, PROT_READ, MAP_PRIVATE, file_fd, 0);
 #ifndef NDEBUG
