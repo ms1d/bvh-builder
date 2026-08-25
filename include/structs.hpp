@@ -5,11 +5,12 @@
 #include "vec3.cuh"
 #include <cstdint>
 
+#define CHILDREN_PER_NODE 4
 
 
 struct bvh_node {
 	vec<3> min, max;
-	bvh_node *left, *right;
+	bvh_node **children;
 	vec<3, uint32_t> *tris;
 	uint32_t tris_len; // tris_len = number of triangles
 };
