@@ -114,16 +114,15 @@ int output_bvh_node(bvh_node *curr_node, vec<3, uint32_t> *root_tris, char *bvh_
 
 	if (curr_node->tris != nullptr) { // LSB = is_leaf = 1
 		auto index = static_cast<uint32_t>(curr_node->tris_len);
-	    ui32_FITS(index, 31);	// TODO: replace with better error handling
+	    ui32_FITS(index, 31);
 		curr_node_out.payload = (index << 1) + 1;
 	}
 	else { // LSB = is_leaf = 0
 		const auto curr_bvh_pos_old = curr_bvh_pos->fetch_add(2);
 		uint32_t left_index = curr_bvh_pos_old + 1, right_index = curr_bvh_pos_old + 2;
 
-		ui32_FITS(left_index, 16); // TODO: replace with better error handling
-		ui32_FITS(right_index, 15); // TODO: replace with better error handling
-		curr_node_out.payload = (left_index << 16) | (right_index << 1);
+		ui32_FITS(left_index, 31);
+		curr_node_out.payload = left_index << 1;
 
 		// Due to stack re-use during recursion, it is not safe to stack allocate task
 		auto task = reinterpret_cast<tp_task<wrapper>*>(memory_pool.alloc(sizeof(tp_task<wrapper>), alignof(tp_task<wrapper>)));

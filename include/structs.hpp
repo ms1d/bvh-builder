@@ -19,6 +19,6 @@ struct bvh_node_serialised {
 
 	// LSB - is_leaf
 	// if is_leaf - 31 bits for tris_index
-	// else - 16 bits for left, 15 bits for right
+	// else - 31 upper bits for left index, right index = left + 1
 	uint32_t payload;
 };
