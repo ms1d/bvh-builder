@@ -10,7 +10,7 @@
 
 
 int parse_mesh(const char *buffer, const uint32_t size, // number of BYTES in data
-		uint32_t *&tris, uint32_t &tris_len,
+		vec<3, uint32_t> *&tris, uint32_t &tris_len,
 		vec<3> *&verts, uint32_t &verts_len,
 		vec<3> &max, vec<3> &min) {
 
@@ -21,9 +21,9 @@ int parse_mesh(const char *buffer, const uint32_t size, // number of BYTES in da
 
 	// Need at least 1 triangle (3 vertices)
 	// Need verts_len to not be too big (allow space for tris_len)
-	if (verts_len < 3 || verts_len * sizeof(vec<3>) + sizeof(tris_len) >= size - sizeof(verts_len)) return -ERR_PARSE_VERTS_LEN;
+	if (verts_len < 3 || sizeof(verts_len) + verts_len * sizeof(vec<3>) + sizeof(tris_len) >= size) return -ERR_PARSE_VERTS_LEN;
 
-	verts = new vec<3>[verts_len];
+	verts = reinterpret_cast<vec<3>*>(memory_pool.alloc(verts_len * sizeof(vec<3>), alignof(vec<3>)));
 	ptr += sizeof(verts_len);
 
 	memcpy(verts, ptr, sizeof(vec<3>) * verts_len);
@@ -51,7 +51,7 @@ int parse_mesh(const char *buffer, const uint32_t size, // number of BYTES in da
 		tasks[i].is_result_ready.wait(false);
 
 	find_min_max_verts(extreme_verts, 2 * TOTAL_WORKERS, &max, &min);
-	
+#undef TOTAL_WORKERS	
 	} else {
 		find_min_max_verts(verts, verts_len, &max, &min);
 	}
@@ -60,11 +60,11 @@ int parse_mesh(const char *buffer, const uint32_t size, // number of BYTES in da
 
 	ptr += 4;
 
-	if ((verts_len + tris_len / 3) * 12 + 8 != size) return -ERR_PARSE_SIZE;
+	if (verts_len * sizeof(vec<3>) + tris_len * sizeof(vec<3, uint32_t>) + sizeof(verts_len) + sizeof(tris_len) != size) return -ERR_PARSE_SIZE;
 
-	// tris_len = number of elements in tris. each triangle is 3 ints
-	tris = new uint32_t[tris_len];
-	memcpy(tris, ptr, tris_len * 4);
+	// tris_len = number of triangles in tris. each triangle is 3 ints
+	tris = reinterpret_cast<vec<3, uint32_t>*>(memory_pool.alloc(tris_len * sizeof(vec<3, uint32_t>), alignof(vec<3, uint32_t>)));
+	memcpy(tris, ptr, tris_len * sizeof(vec<3, uint32_t>));
 	return true;
 }
 

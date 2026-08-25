@@ -21,7 +21,7 @@ struct build_bvh_node_args {
 
 struct output_bvh_node_args {
 	bvh_node *curr_node;
-	uint32_t *root_tris;
+	vec<3, uint32_t> *root_tris;
 	char *output_buffer;
 	std::atomic<uint32_t> *curr_bvh_pos;
 	uint32_t curr_node_index;
@@ -65,5 +65,5 @@ inline int wrapper(int type, void *data) {
 #define NUM_TASKS 16
 inline thread_pool<wrapper, NUM_THREADS, NUM_TASKS, pool_type::vyukov_buffer_spin> worker_pool{};
 
-#define POOL_SIZE 10'000'000
+#define POOL_SIZE 100'000'000
 inline bump_pool<char, POOL_SIZE, mp_type::thread_safe> memory_pool{};

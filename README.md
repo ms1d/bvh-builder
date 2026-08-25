@@ -15,9 +15,13 @@ in c++ to run on little-endian machines.
 
 - `vec<3> *verts` (see [ms1d/vec](https://github.com/ms1d/vec))
 
-- `uint32_t tris_len` (number of elements in `tris`)
+- `uint32_t tris_len` (number of triangles in `tris`)
 
-- `uint32_t *tris` (each tri is 3 indices into `verts`)
+- `vec<3, uint32_t> *tris` (each tri is 3 indices into `verts`).
+
+Please ignore any and all references to `tris_len` being the number
+of elements in `tris` rather than the number of tris!
+Refactor in progress...
 
 ## Output Format
 
@@ -25,9 +29,9 @@ in c++ to run on little-endian machines.
 
 - `vec<3> *verts` (see [ms1d/vec](https://github.com/ms1d/vec))
 
-- `uint32_t tris_len` (number of elements in `tris`)
+- `uint32_t tris_len` (number of triangles in `tris`)
 
-- `uint32_t *tris` (each tri is 3 indices into `verts`). Now sorted for the BVH
+- `vec<3, uint32_t> *tris` (each tri is 3 indices into `verts`), now sorted
 
 - `uint16_t nodes_len` (number of nodes in `nodes`)
 

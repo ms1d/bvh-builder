@@ -10,7 +10,8 @@
 struct bvh_node {
 	vec<3> min, max;
 	bvh_node *left, *right;
-	uint32_t *tris, tris_len; // tris_len = number of elements in tris
+	vec<3, uint32_t> *tris;
+	uint32_t tris_len; // tris_len = number of triangles
 };
 
 struct bvh_node_serialised {

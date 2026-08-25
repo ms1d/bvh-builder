@@ -7,7 +7,7 @@
 
 
 int parse_mesh(const char *buffer, const uint32_t size,
-		uint32_t *&tris, uint32_t &tris_len,
+		vec<3, uint32_t> *&tris, uint32_t &tris_len,
 		vec<3> *&verts, uint32_t &verts_len,
 		vec<3> &max, vec<3> &min);
 

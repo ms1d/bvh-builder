@@ -15,25 +15,11 @@
 
 
 
-// Max number of elements in tris per child INCLUSIVE
-#define MAX_TRIS 150
+// Max number of triangles per leaf INCLUSIVE
+#define MAX_TRIS 50
 
 // (MACRO) Checks that uin32_t x fits in y bits for 0 < y <= 32
 #define ui32_FITS(x, y) if(x != (x << (32 - y)) >> (32 - y)) { return -ERR_BUILD_OVERFLOW; }
-
-
-
-
-void find_min_max_verts(vec<3> *verts, uint32_t *tris, uint32_t len, vec<3> &out_min, vec<3> &out_max) {
-	out_min = verts[tris[0]]; out_max = out_min;
-
-	for (uint32_t i = 1; i < len; i++) {
-		auto curr = verts[tris[i]];
-		out_min.x = std::min(curr.x, out_min.x); out_max.x = std::max(curr.x, out_max.x);
-		out_min.y = std::min(curr.y, out_min.y); out_max.y = std::max(curr.y, out_max.y);
-		out_min.z = std::min(curr.z, out_min.z); out_max.z = std::max(curr.z, out_max.z);
-	}
-}
 
 
 
@@ -57,21 +43,20 @@ int build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> *nodes_l
 
 	// Sort tris in place and produce pointers for children
 	// Front is for left, right is for back
-	uint *front = node->tris, *back = node->tris + node->tris_len - 3;
+	vec<3, uint32_t> *front = node->tris, *back = node->tris + node->tris_len - 3;
 	const float mid = offset.data[longest_axis] + node->min.data[longest_axis];
 	
 	while (front < back) {
-		bool lc = verts[(*front)].data[longest_axis] > mid,
-			 rc = verts[*(back)].data[longest_axis] <= mid;
+		// Arbritary dimensions picked here
+		bool lc = verts[(front->x)].data[longest_axis] > mid,
+			 rc = verts[back->x].data[longest_axis] <= mid;
 
-		if (lc) front += 3;
-		else if (rc) back  -= 3;
+		if (lc) front += 1;
+		else if (rc) back  -= 1;
 		else {
-			uint f0 = front[0], f1 = front[1], f2 = front[2];
-			uint b0 = back[0],  b1 = back[1],  b2 = back[2];
-
-			front[0]=b0; front[1]=b1; front[2]=b2;
-			back[0]=f0;  back[1]=f1;  back[2]=f2;
+			auto tmp = *front;
+			*front = *back;
+			*back = tmp;
 		}
 	}
 
@@ -113,7 +98,7 @@ int build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> *nodes_l
 }
 
 
-int output_bvh_node(bvh_node *curr_node, uint32_t *root_tris, char *bvh_output_buffer, std::atomic<uint32_t> *curr_bvh_pos, uint32_t curr_node_index) {
+int output_bvh_node(bvh_node *curr_node, vec<3, uint32_t> *root_tris, char *bvh_output_buffer, std::atomic<uint32_t> *curr_bvh_pos, uint32_t curr_node_index) {
 	if (curr_node == nullptr) return 0;
 
 	bvh_node_serialised curr_node_out;
@@ -183,12 +168,9 @@ void free_bvh_children(bvh_node *node) {
 
 
 
-void cleanup(bvh_node *root, vec<3> *verts, uint32_t *tris) {
+void cleanup(bvh_node *root) {
 	free_bvh_children(root);
 	memory_pool.free();
-	if (verts != nullptr) delete[] verts;
-	if (tris != nullptr) delete[] tris;
-	if (root != nullptr) delete root;
 }
 
 
@@ -198,7 +180,8 @@ int build_bvh(const char *buffer, char *output_buffer, const uint32_t size_in, u
 	auto s = std::chrono::high_resolution_clock::now();
 #endif
 
-	uint32_t *tris, verts_len, tris_len;
+	vec<3, uint32_t> *tris;
+	uint32_t verts_len, tris_len;
 	vec<3> *verts, max, min;
 
 #ifndef NDEBUG
@@ -206,13 +189,13 @@ int build_bvh(const char *buffer, char *output_buffer, const uint32_t size_in, u
 #endif
 
 	auto success = parse_mesh(buffer, size_in, tris, tris_len, verts, verts_len, max, min);
-	if (success < 0) { cleanup(nullptr, verts, tris); return success; }
+	if (success < 0) { cleanup(nullptr); return success; }
 
 #ifndef NDEBUG
 	auto e_mesh = std::chrono::high_resolution_clock::now();
 #endif
 
-	auto *root = new bvh_node{};
+	bvh_node *root = reinterpret_cast<bvh_node*>(memory_pool.alloc(sizeof(bvh_node), alignof(bvh_node)));
 	root->tris = tris; root->tris_len = tris_len; root->max = max; root->min = min;
 	std::atomic<uint16_t> nodes_len = 0;
 
@@ -221,7 +204,7 @@ int build_bvh(const char *buffer, char *output_buffer, const uint32_t size_in, u
 #endif
 
 	success = build_bvh_node(root, verts, &nodes_len);
-	if (success < 0) { cleanup(root, verts, tris); return success; }
+	if (success < 0) { cleanup(root); return success; }
 
 #ifndef NDEBUG
 	auto e_bvh = std::chrono::high_resolution_clock::now();
@@ -238,7 +221,7 @@ int build_bvh(const char *buffer, char *output_buffer, const uint32_t size_in, u
 
 	std::atomic<uint32_t> curr_bvh_pos = 0;
 	success = output_bvh_node(root, tris, ptr + sizeof(nodes_len), &curr_bvh_pos, 0);
-	if (success < 0) { cleanup(root, verts, tris); return success; }
+	if (success < 0) { cleanup(root); return success; }
 
 #ifndef NDEBUG
 	auto e_out = std::chrono::high_resolution_clock::now();
@@ -246,7 +229,7 @@ int build_bvh(const char *buffer, char *output_buffer, const uint32_t size_in, u
 
 	*size_out = sizeof(nodes_len) + nodes_len * sizeof(bvh_node_serialised);
 
-	cleanup(root, verts, tris);
+	cleanup(root);
 
 #ifndef NDEBUG
 	auto e = std::chrono::high_resolution_clock::now();
