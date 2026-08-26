@@ -1,5 +1,28 @@
 # bvh-builder
 
+<!--toc:start-->
+- [bvh-builder](#bvh-builder)
+  - [Features](#features)
+  - [Architecture Diagrams](#architecture-diagrams)
+    - [Startup flow](#startup-flow)
+    - [Usage flow](#usage-flow)
+  - [Design decisions](#design-decisions)
+    - [Why a daemon?](#why-a-daemon)
+    - [Why 1 shared thread pool via `wrapper`?](#why-1-shared-thread-pool-via-wrapper)
+    - [Why support many children per node?](#why-support-many-children-per-node)
+    - [Why IPC sockets?](#why-ipc-sockets)
+  - [Build instructions](#build-instructions)
+    - [Notes](#notes)
+  - [Usage](#usage)
+    - [Input Format](#input-format)
+    - [Output Format](#output-format)
+  - [Benchmarks](#benchmarks)
+    - [End-to-End](#end-to-end)
+    - [Impact on custom resource pools](#impact-on-custom-resource-pools)
+  - [AI Usage](#ai-usage)
+  - [Limitations](#limitations)
+<!--toc:end-->
+
 CPU BVH builder for assorted rendering applications
 in C++23. Tested on x86-64 Linux.
 
