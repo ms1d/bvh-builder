@@ -35,7 +35,6 @@ struct find_min_max_verts_args {
 	vec<3> *min_out;
 };
 
-struct output_bvh_node_args;
 inline int wrapper(int type, void *data) {
 	switch (type) {
 		case WRAPPER_TYPE_BUILD: {
