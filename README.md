@@ -1,7 +1,7 @@
 # bvh-builder
 
 CPU BVH builder for assorted rendering applications
-in C++23 to run on little-endian machines.
+in C++23. Tested on x86-64 Linux.
 
 ## Features
 
@@ -60,12 +60,12 @@ threads allocated from the kernel are not wasted.
 
 ### Why support many children per node?
 
-Each output BVH node takes up 16 bytes, and as such 4 can be fit per
-cache line on most CPUs and GPUs. As a result, storing all children
-of a node contiguously can improve cache locality when traversing
-the BVH in applications. However, certain applications may perform
-better with a different number of children per node, and as such the
-option has been left available. Planned: specialised `build_bvh_node`
+Each output BVH node takes up 16 bytes, and as such, 4 can be fit per
+cache line on typical 64-byte cacheline architectures. As a result,
+storing all children of a node contiguously can improve cache locality
+when traversing the BVH in applications. However, certain applications
+may perform better with a different number of children per node, and as
+such the option has been left available. Planned: specialised `build_bvh_node`
 function for binary BVHs to improve throughput under constraints.
 
 ## Build instructions
@@ -122,13 +122,18 @@ Measurements were repeated 1000 times. Daemon startup time **NOT** included
 All BVH4 benchmarks below were run on Ryzen 7 8845HS. [Input model used was the
 Stanford Dragon (~870k tri)](https://graphics.stanford.edu/data/3Dscanrep).
 Measurements were repeated 1000 times. Daemon startup time **NOT** included.
+Memory-pool replaced ALL heap allocations (new/delete) in respective variants.
 
-| Name | Avg Time ± S.D. (ms) | Throughput (M tris/sec) | x baseline |
-| --------------- | --------------- | --------------- | --------------- |
-| 1T + new/delete (baseline) | 54.0 ± 1.6 | 16.1 ± 1.0 | 1.00 |
-| 16T + new/delete | ? ± ? | ? ± ? | ? |
-| 1T + memory-pool | 53.1 ± 1.5 | 16.4 ± 0.9 | 1.02 |
-| 16T + memory-pool | 30.3 ± 1.3 | 28.7 ± 2.5 | ? |
+| Name | Avg Time ± S.D. (ms) | Throughput (M tris/sec) | Speedup (x) |
+| ---- | -------------------- | ----------------------- | ----------- |
+| 1T + new/delete (baseline) | 54.0 ± 1.6 | 16.11 ± 0.46 | **1.00** |
+| 1T + memory-pool | 53.1 ± 1.5 | 16.38 ± 0.46 | **1.02** |
+| 16T + new/delete | 27.2 ± 1.3 | 31.99 ± 1.53 | **1.98** |
+| 16T + memory-pool | 26.4 ± 1.3 | 32.95 ± 1.62 | **2.05** |
+
+Multi-threaded execution had a drastic impact on throughput, with
+memory pooling offering modest but noticeable speedups due to the
+compute-bound nature of the problem.
 
 ## AI Usage
 
