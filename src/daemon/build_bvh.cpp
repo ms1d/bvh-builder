@@ -16,15 +16,14 @@
 
 
 // Max number of triangles per leaf INCLUSIVE
-#define MAX_TRIS 50
+#define MAX_TRIS   50
+#define SMALL_TRIS 1
 
-// (MACRO) Checks that uin32_t x fits in y bits for 0 < y <= 32
+// (MACRO) Checks that uint32_t x fits in y bits for 0 < y <= 32
 #define ui32_FITS(x, y) if(x != (x << (32 - y)) >> (32 - y)) { return -ERR_BUILD_OVERFLOW; }
 
-
-
 int build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> *nodes_len) {
-	// If node has few tris, do not recurse; return to caller
+	// Base case
 	if (node->tris_len <= MAX_TRIS) { nodes_len->fetch_add(1, std::memory_order_relaxed); return 0; }
 
 	// 1 - Split BVH by longest axis
@@ -34,45 +33,51 @@ int build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> *nodes_l
 	offset.data[longest_axis] /= CHILDREN_PER_NODE; offset.data[(longest_axis + 1) % 3] = 0; offset.data[(longest_axis + 2) % 3] = 0;
 
 	// 2 - Create new children
-	node->children = reinterpret_cast<bvh_node**>(memory_pool.alloc(CHILDREN_PER_NODE * sizeof(bvh_node*), alignof(bvh_node*)));
+	node->children = reinterpret_cast<bvh_node*>(memory_pool.alloc(CHILDREN_PER_NODE * sizeof(bvh_node), alignof(bvh_node)));
+	if (node->children == nullptr) return -ERR_BUILD_BAD_ALLOC;
+	vec<3, uint32_t> *front = node->tris, *back = node->tris + node->tris_len - 1;
+
 	for (uint32_t i = 0; i < CHILDREN_PER_NODE; i++) {
 		auto &child = node->children[i];
-		child = reinterpret_cast<bvh_node*>(memory_pool.alloc(sizeof(bvh_node), alignof(bvh_node)));
-		child->min = node->min + offset * i;
-		child->max = node->min + offset * (i + 1);
-	}
+		child.min = node->min + offset * i;
+		child.max = node->max - offset * (CHILDREN_PER_NODE - i - 1);
 
-	// Sort tris in place and produce pointers for children
-	// Front is for left, right is for back
-	
-	vec<3, uint32_t> *front = node->tris, *back = node->tris + node->tris_len - 1;
-	for (uint32_t i = 0; i < CHILDREN_PER_NODE; i++) {
-		const float boundary = i * offset.data[longest_axis] + node->min.data[longest_axis];
+		if (i == CHILDREN_PER_NODE - 1) {
+			child.tris = front;
+			child.tris_len = static_cast<uint32_t>(back - front + 1);
+			break;
+		}
+
+		const float boundary = child.max.data[longest_axis];
 
 		// TODO - experiment with allocating more memory to reduce compute!
 		while (front < back) {
 			// Arbritary dimensions picked here
-			bool lc = verts[(front->x)].data[longest_axis] > boundary,
-				 rc = verts[back->x].data[longest_axis] <= boundary;
+			bool lc = verts[front->x].data[longest_axis] <= boundary,
+				 rc = verts[back->x].data[longest_axis] > boundary;
 
 			if (lc) front++;
-			else if (rc) back--;
-			else {
-				auto tmp = *front;
-				*front = *back;
-				*back = tmp;
-			}
+			if (rc) back--;
+			else if (!lc) std::swap(*front, *back);
 		}
 
+		auto old_front = i > 0 ? node->children[i - 1].tris + node->children[i - 1].tris_len : node->tris;
+		child.tris = old_front;
+		child.tris_len = static_cast<uint32_t>(front - old_front);
 		back = node->tris + node->tris_len - 1;
-
-		auto &child = node->children[i];
-		child->tris = front; child->tris_len = static_cast<uint32_t>(node->tris_len - (front - node->tris));
 	}
 
-	// front now points to the start of right's nodes
-	// node->right->tris = front; node->right->tris_len = static_cast<uint32_t>(node->tris_len - (front - node->tris));
-	// node->left->tris = node->tris; node->left->tris_len = node->tris_len - node->right->tris_len;
+	int empty_count = 0;
+	for (uint32_t i = 0; i < CHILDREN_PER_NODE; i++)
+		if (node->children[i].tris_len < SMALL_TRIS) empty_count++;
+
+	// Most tris went into 1 child - no point in trying to keep going
+	// Take the L and move on
+	if (empty_count == CHILDREN_PER_NODE - 1) {
+		node->tris = nullptr;
+		nodes_len->fetch_add(1 + CHILDREN_PER_NODE, std::memory_order_relaxed);
+		return 0;
+	}
 
 	// 3 - Recurse + await results
 
@@ -85,13 +90,13 @@ int build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> *nodes_l
 
 	if (tasks == nullptr || args == nullptr) return -ERR_BUILD_BAD_ALLOC;
 	for (uint32_t i = 0; i < CHILDREN_PER_NODE-1; i++) {
-		args[i] = build_bvh_node_args{ node->children[i], verts, nodes_len };
+		args[i] = build_bvh_node_args{ node->children + i, verts, nodes_len };
 		tasks[i].args = std::make_tuple(WRAPPER_TYPE_BUILD, static_cast<void*>(args+i));
 		tasks[i].is_result_ready = false;
 		results[i] = worker_pool.try_submit(tasks + i);
 	}
 
-	errs[CHILDREN_PER_NODE-1] = build_bvh_node(node->children[CHILDREN_PER_NODE-1], verts, nodes_len);
+	errs[CHILDREN_PER_NODE-1] = build_bvh_node(node->children + CHILDREN_PER_NODE-1, verts, nodes_len);
 
 	
 	for (uint32_t i = 0; i < CHILDREN_PER_NODE-1; i++) {
@@ -102,7 +107,7 @@ int build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> *nodes_l
 
 			errs[i] = tasks[i].result;
 		} else {
-			errs[i] = build_bvh_node(node->children[i], verts, nodes_len);
+			errs[i] = build_bvh_node(node->children + i, verts, nodes_len);
 		}
 	}
 
@@ -150,31 +155,33 @@ int output_bvh_node(bvh_node *curr_node, vec<3, uint32_t> *root_tris, char *bvh_
 		bool results[CHILDREN_PER_NODE-1];
 		int errs[CHILDREN_PER_NODE];
 
-		if (tasks == nullptr || args == nullptr) return -ERR_BUILD_BAD_ALLOC;
+		if (tasks == nullptr) return -ERR_BUILD_BAD_ALLOC;
+		if (args == nullptr) return -ERR_BUILD_BAD_ALLOC;
 		for (uint32_t i = 0; i < CHILDREN_PER_NODE-1; i++) {
-			args[i] = output_bvh_node_args{ curr_node->children[i], root_tris, bvh_output_buffer, curr_bvh_pos, left_index + i };
-			tasks[i].args = std::make_tuple(WRAPPER_TYPE_BUILD, static_cast<void*>(args+i));
+			args[i] = output_bvh_node_args{ curr_node->children + i, root_tris, bvh_output_buffer, curr_bvh_pos, left_index + i };
+			tasks[i].args = std::make_tuple(WRAPPER_TYPE_OUTPUT, static_cast<void*>(args+i));
 			tasks[i].is_result_ready = false;
+			tasks[i].result = 0;
 			results[i] = worker_pool.try_submit(tasks + i);
 		}
 
 		errs[CHILDREN_PER_NODE-1] = output_bvh_node(
-			curr_node->children[CHILDREN_PER_NODE-1],
+			curr_node->children + CHILDREN_PER_NODE-1,
 			root_tris,
 			bvh_output_buffer,
 			curr_bvh_pos,
 			left_index + CHILDREN_PER_NODE-1
 		);
-
-		
+	
 		for (int i = 0; i < CHILDREN_PER_NODE-1; i++) {
 			if (results[i]) {
 				while (!tasks[i].is_result_ready.load(std::memory_order_acquire)) {
 					if (!worker_pool.try_claim()) tasks[i].is_result_ready.wait(false, std::memory_order_acquire);
 					errs[i] = tasks[i].result;
+					if (errs[i] < 0) return errs[i];
 				}
 			} else {
-				errs[i] = output_bvh_node(curr_node->children[i], root_tris, bvh_output_buffer, curr_bvh_pos, left_index + i);
+				errs[i] = output_bvh_node(curr_node->children + i, root_tris, bvh_output_buffer, curr_bvh_pos, left_index + i);
 			}
 		}
 
