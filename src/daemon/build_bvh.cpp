@@ -150,11 +150,8 @@ int output_bvh_node(bvh_node *curr_node, vec<3, uint32_t> *root_tris, char *bvh_
 		curr_node_out.payload = first_index << 1;
 
 		// Due to stack re-use during recursion, it is not safe to stack allocate tasks
-		//auto tasks = reinterpret_cast<tp_task<wrapper>*>(memory_pool.alloc((CHILDREN_PER_NODE-1) * sizeof(tp_task<wrapper>), alignof(tp_task<wrapper>)));
-		//auto args = reinterpret_cast<output_bvh_node_args*>(memory_pool.alloc((CHILDREN_PER_NODE-1) * sizeof(output_bvh_node_args), alignof(output_bvh_node_args)));
-
-		auto tasks = new tp_task<wrapper>[CHILDREN_PER_NODE-1];
-		auto args = new output_bvh_node_args[CHILDREN_PER_NODE-1];
+		auto tasks = reinterpret_cast<tp_task<wrapper>*>(memory_pool.alloc((CHILDREN_PER_NODE-1) * sizeof(tp_task<wrapper>), alignof(tp_task<wrapper>)));
+		auto args = reinterpret_cast<output_bvh_node_args*>(memory_pool.alloc((CHILDREN_PER_NODE-1) * sizeof(output_bvh_node_args), alignof(output_bvh_node_args)));
 
 		bool results[CHILDREN_PER_NODE-1];
 		int errs[CHILDREN_PER_NODE];
@@ -188,8 +185,6 @@ int output_bvh_node(bvh_node *curr_node, vec<3, uint32_t> *root_tris, char *bvh_
 				errs[i] = output_bvh_node(curr_node->children + i, root_tris, bvh_output_buffer, curr_bvh_pos, first_index + i);
 			}
 		}
-
-		delete[] tasks; delete[] args;
 
 		// ISSUE - if errors differ, the first one will be returned.
 		for (int i = 0; i < CHILDREN_PER_NODE; i++) if (errs[i] < 0) return errs[i];
