@@ -90,9 +90,10 @@ int build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> *nodes_l
 
 	if (tasks == nullptr || args == nullptr) return -ERR_BUILD_BAD_ALLOC;
 	for (uint32_t i = 0; i < CHILDREN_PER_NODE-1; i++) {
-		args[i] = build_bvh_node_args{ node->children + i, verts, nodes_len };
-		tasks[i].args = std::make_tuple(WRAPPER_TYPE_BUILD, static_cast<void*>(args+i));
-		tasks[i].is_result_ready = false;
+		args   [i] = build_bvh_node_args{ node->children + i, verts, nodes_len };
+		tasks  [i].args = std::make_tuple(WRAPPER_TYPE_BUILD, static_cast<void*>(args+i));
+		tasks  [i].is_result_ready = false;
+		tasks  [i].result = 0;
 		results[i] = worker_pool.try_submit(tasks + i);
 	}
 
@@ -101,9 +102,9 @@ int build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> *nodes_l
 	
 	for (uint32_t i = 0; i < CHILDREN_PER_NODE-1; i++) {
 		if (results[i]) {
-			while (!tasks[i].is_result_ready.load(std::memory_order_acquire)) {
-				if (!worker_pool.try_claim()) tasks[i].is_result_ready.wait(false, std::memory_order_acquire);
-			}
+			while (!tasks[i].is_result_ready.load(std::memory_order_acquire))
+				if (!worker_pool.try_claim())
+					tasks[i].is_result_ready.wait(false, std::memory_order_acquire);
 
 			errs[i] = tasks[i].result;
 		} else {
@@ -142,15 +143,18 @@ int output_bvh_node(bvh_node *curr_node, vec<3, uint32_t> *root_tris, char *bvh_
 		curr_node_out.payload = (index << 1) + 1;
 	}
 	else { // LSB = is_leaf = 0
-		const auto curr_bvh_pos_old = curr_bvh_pos->fetch_add(2);
-		uint32_t left_index = curr_bvh_pos_old + 1;
+		const auto curr_bvh_pos_old = curr_bvh_pos->fetch_add(CHILDREN_PER_NODE, std::memory_order_relaxed);
+		uint32_t first_index = curr_bvh_pos_old + 1;
 
-		ui32_FITS((left_index + CHILDREN_PER_NODE - 1), 31);
-		curr_node_out.payload = left_index << 1;
+		ui32_FITS((first_index + CHILDREN_PER_NODE - 1), 31);
+		curr_node_out.payload = first_index << 1;
 
-		// Due to stack re-use during recursion, it is not safe to stack allocate task
-		auto tasks = reinterpret_cast<tp_task<wrapper>*>(memory_pool.alloc((CHILDREN_PER_NODE-1) * sizeof(tp_task<wrapper>), alignof(tp_task<wrapper>)));
-		auto args = reinterpret_cast<output_bvh_node_args*>(memory_pool.alloc((CHILDREN_PER_NODE-1) * sizeof(output_bvh_node_args), alignof(output_bvh_node_args)));
+		// Due to stack re-use during recursion, it is not safe to stack allocate tasks
+		//auto tasks = reinterpret_cast<tp_task<wrapper>*>(memory_pool.alloc((CHILDREN_PER_NODE-1) * sizeof(tp_task<wrapper>), alignof(tp_task<wrapper>)));
+		//auto args = reinterpret_cast<output_bvh_node_args*>(memory_pool.alloc((CHILDREN_PER_NODE-1) * sizeof(output_bvh_node_args), alignof(output_bvh_node_args)));
+
+		auto tasks = new tp_task<wrapper>[CHILDREN_PER_NODE-1];
+		auto args = new output_bvh_node_args[CHILDREN_PER_NODE-1];
 
 		bool results[CHILDREN_PER_NODE-1];
 		int errs[CHILDREN_PER_NODE];
@@ -158,10 +162,10 @@ int output_bvh_node(bvh_node *curr_node, vec<3, uint32_t> *root_tris, char *bvh_
 		if (tasks == nullptr) return -ERR_BUILD_BAD_ALLOC;
 		if (args == nullptr) return -ERR_BUILD_BAD_ALLOC;
 		for (uint32_t i = 0; i < CHILDREN_PER_NODE-1; i++) {
-			args[i] = output_bvh_node_args{ curr_node->children + i, root_tris, bvh_output_buffer, curr_bvh_pos, left_index + i };
-			tasks[i].args = std::make_tuple(WRAPPER_TYPE_OUTPUT, static_cast<void*>(args+i));
-			tasks[i].is_result_ready = false;
-			tasks[i].result = 0;
+			args   [i] = output_bvh_node_args{ curr_node->children + i, root_tris, bvh_output_buffer, curr_bvh_pos, first_index + i };
+			tasks  [i].args = std::make_tuple(WRAPPER_TYPE_OUTPUT, static_cast<void*>(args+i));
+			tasks  [i].is_result_ready = false;
+			tasks  [i].result = 0;
 			results[i] = worker_pool.try_submit(tasks + i);
 		}
 
@@ -170,20 +174,22 @@ int output_bvh_node(bvh_node *curr_node, vec<3, uint32_t> *root_tris, char *bvh_
 			root_tris,
 			bvh_output_buffer,
 			curr_bvh_pos,
-			left_index + CHILDREN_PER_NODE-1
+			first_index + CHILDREN_PER_NODE-1
 		);
 	
 		for (int i = 0; i < CHILDREN_PER_NODE-1; i++) {
 			if (results[i]) {
-				while (!tasks[i].is_result_ready.load(std::memory_order_acquire)) {
-					if (!worker_pool.try_claim()) tasks[i].is_result_ready.wait(false, std::memory_order_acquire);
-					errs[i] = tasks[i].result;
-					if (errs[i] < 0) return errs[i];
-				}
+				while (!tasks[i].is_result_ready.load(std::memory_order_acquire))
+					if (!worker_pool.try_claim())
+						tasks[i].is_result_ready.wait(false, std::memory_order_acquire);
+
+				errs[i] = tasks[i].result;
 			} else {
-				errs[i] = output_bvh_node(curr_node->children + i, root_tris, bvh_output_buffer, curr_bvh_pos, left_index + i);
+				errs[i] = output_bvh_node(curr_node->children + i, root_tris, bvh_output_buffer, curr_bvh_pos, first_index + i);
 			}
 		}
+
+		delete[] tasks; delete[] args;
 
 		// ISSUE - if errors differ, the first one will be returned.
 		for (int i = 0; i < CHILDREN_PER_NODE; i++) if (errs[i] < 0) return errs[i];
