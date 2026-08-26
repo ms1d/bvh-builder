@@ -68,6 +68,13 @@ may perform better with a different number of children per node, and as
 such the option has been left available. Planned: specialised `build_bvh_node`
 function for binary BVHs to improve throughput under constraints.
 
+### Why IPC sockets?
+
+IPC sockets allow for communication between the client and daemon without
+network overhead. A dedicated HTTP API would have been overkill for this
+project, but the underlying socket infrastructure allows for future refactors
+to be (relatively) painless if the need arises.
+
 ## Build instructions
 
 See `CMakePresets.json` for CMake presets. Syntax: `cmake --preset <preset>`
