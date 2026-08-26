@@ -47,10 +47,10 @@ flowchart LR
     daemon --> validate-input
     validate-input -.-> |IPC err| client
     validate-input --> build-bvh
-    build-bvh -.->resources
+    build-bvh -.-> resources
     resources --> thread-pool
     resources --> memory-pool
-    build-bvh --> daemon
+    build-bvh --> |BVH built| daemon
     daemon --> |IPC out| client
 ```
 
