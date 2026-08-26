@@ -1,16 +1,6 @@
 // ---------------------------------
-// AI USAGE DISCLOSURE
+// AI USAGE DISCLOSURE - see README.md
 // ---------------------------------
-//
-// This script was generated entirely by AI (ChatGPT) to automate the testing of
-// the bvh-builder from existing models (most notably, the Stanford
-// Dragon from https://graphics.stanford.edu/data/3Dscanrep/)
-//
-// I do NOT claim ownership of the code.
-//
-// After brief surface level checks in my application, it seems to
-// function well enough to leave it as-is. Any queries or concerns,
-// feel free to contact me on github or email me at maahdsiddiqui07@outlook.com
 
 
 
