@@ -4,8 +4,8 @@
 - [bvh-builder](#bvh-builder)
   - [Features](#features)
   - [Architecture Diagrams](#architecture-diagrams)
-  - [Design decisions](#design-decisions)
-  - [Build instructions](#build-instructions)
+  - [Design Decisions](#design-decisions)
+  - [Build Instructions](#build-instructions)
   - [Usage](#usage)
   - [Benchmarks](#benchmarks)
   - [AI Usage](#ai-usage)
@@ -54,7 +54,7 @@ flowchart LR
     daemon --> |IPC out| client
 ```
 
-## Design decisions
+## Design Decisions
 
 ### Why a daemon?
 
@@ -87,7 +87,7 @@ network overhead. A dedicated HTTP API would have been overkill for this
 project, but the underlying socket infrastructure allows for future refactors
 to be (relatively) painless if the need arises.
 
-## Build instructions
+## Build Instructions
 
 See `CMakePresets.json` for CMake presets. Syntax: `cmake --preset <preset>`
 and `cmake --build --preset <preset>`
