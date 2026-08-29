@@ -10,7 +10,7 @@
 
 struct bvh_node {
 	vec<3> min, max;
-	bvh_node *children;
+	bvh_node *children = nullptr;
 	vec<3, uint32_t> *tris;
 	uint32_t tris_len; // tris_len = number of triangles
 };

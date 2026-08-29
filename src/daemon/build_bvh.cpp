@@ -22,9 +22,44 @@
 // (MACRO) Checks that uint32_t x fits in y bits for 0 < y <= 32
 #define ui32_FITS(x, y) if(x != (x << (32 - y)) >> (32 - y)) { return -ERR_BUILD_OVERFLOW; }
 
-int build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> *nodes_len) {
+int end_bvh_recursion(bvh_node *node, std::atomic<uint32_t> *nodes_len) {
+	node->tris = nullptr;
+	nodes_len->fetch_add(1 + CHILDREN_PER_NODE, std::memory_order_relaxed);
+
+	// Merge bounds
+	for (uint32_t i = 0; i < CHILDREN_PER_NODE; i++) {
+		node->max.x = std::max(node->max.x, node->children[i].max.x);
+		node->max.y = std::max(node->max.y, node->children[i].max.y);
+		node->max.z = std::max(node->max.z, node->children[i].max.z);
+
+		node->min.x = std::min(node->min.x, node->children[i].min.x);
+		node->min.y = std::min(node->min.y, node->children[i].min.y);
+		node->min.z = std::min(node->min.z, node->children[i].min.z);
+	}
+
+	return 0;
+}
+
+int build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint32_t> *nodes_len) {
 	// Base case
-	if (node->tris_len <= MAX_TRIS) { nodes_len->fetch_add(1, std::memory_order_relaxed); return 0; }
+	if (node->tris_len <= MAX_TRIS) {
+		nodes_len->fetch_add(1, std::memory_order_relaxed);
+		for (uint32_t i = 0; i < node->tris_len; i++) {
+			auto &tri = node->tris[i];
+			for (int j = 0; j < 3; j++) {
+				auto &vert = verts[tri.data[j]];
+
+				node->max.x = std::max(node->max.x, vert.x);
+				node->max.y = std::max(node->max.y, vert.y);
+				node->max.z = std::max(node->max.z, vert.z);
+
+				node->min.x = std::min(node->min.x, vert.x);
+				node->min.y = std::min(node->min.y, vert.y);
+				node->min.z = std::min(node->min.z, vert.z);
+			}
+		}
+		return 0;
+	}
 
 	// 1 - Split BVH by longest axis
 	vec<3> offset = vec<3>(node->max - node->min);
@@ -73,11 +108,7 @@ int build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> *nodes_l
 
 	// Most tris went into 1 child - no point in trying to keep going
 	// Take the L and move on
-	if (empty_count == CHILDREN_PER_NODE - 1) {
-		node->tris = nullptr;
-		nodes_len->fetch_add(1 + CHILDREN_PER_NODE, std::memory_order_relaxed);
-		return 0;
-	}
+	if (empty_count == CHILDREN_PER_NODE - 1) return end_bvh_recursion(node, nodes_len);
 
 	// 3 - Recurse + await results
 
@@ -118,7 +149,19 @@ int build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint16_t> *nodes_l
 	// This node has children so set its tris to nullptr.
 	// Ignore tris_len in this case
 	node->tris = nullptr;
-	nodes_len->fetch_add(1);
+	nodes_len->fetch_add(1, std::memory_order_relaxed);
+
+	// Merge bounds
+	for (uint32_t i = 0; i < CHILDREN_PER_NODE; i++) {
+		node->max.x = std::max(node->max.x, node->children[i].max.x);
+		node->max.y = std::max(node->max.y, node->children[i].max.y);
+		node->max.z = std::max(node->max.z, node->children[i].max.z);
+
+		node->min.x = std::min(node->min.x, node->children[i].min.x);
+		node->min.y = std::min(node->min.y, node->children[i].min.y);
+		node->min.z = std::min(node->min.z, node->children[i].min.z);
+	}
+
 	return 0;
 }
 
@@ -218,7 +261,7 @@ int build_bvh(const char *buffer, char *output_buffer, const uint32_t size_in, u
 
 	bvh_node *root = reinterpret_cast<bvh_node*>(memory_pool.alloc(sizeof(bvh_node), alignof(bvh_node)));
 	root->tris = tris; root->tris_len = tris_len; root->max = max; root->min = min;
-	std::atomic<uint16_t> nodes_len = 0;
+	std::atomic<uint32_t> nodes_len = 0;
 
 #ifndef NDEBUG
 	auto s_bvh = std::chrono::high_resolution_clock::now();

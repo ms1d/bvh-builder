@@ -16,7 +16,7 @@
 struct build_bvh_node_args {
 	bvh_node *node;
 	vec<3> *verts;
-	std::atomic<uint16_t> *nodes_len;
+	std::atomic<uint32_t> *nodes_len;
 };
 
 struct output_bvh_node_args {
