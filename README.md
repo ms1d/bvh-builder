@@ -134,7 +134,7 @@ Measurements were repeated 1000 times. Daemon startup time **NOT** included
 
 | Name | Tris | Avg Time ± S.D. (ms) | Throughput (M tris/sec) |
 | --------------- | --------------- | --------------- | --------------- |
-| [Stanford Dragon](https://graphics.stanford.edu/data/3Dscanrep/) | ~870k | 30.3 ± 1.3 | 28.7 ± 2.5 |
+| [Stanford Dragon](https://graphics.stanford.edu/data/3Dscanrep/) | ~870k | 26.4 ± 1.3 | 32.95 ± 1.62 |
 
 ### Impact on custom resource pools
 
