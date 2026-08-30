@@ -121,7 +121,7 @@ reviewed during refactors.
 
 ### Output Format
 
-- `uint16_t nodes_len` (number of nodes in `nodes`)
+- `uint32_t nodes_len` (number of nodes in `nodes`)
 
 - `bvh_node_serialised *nodes` (see `include/structs.hpp`)
 
