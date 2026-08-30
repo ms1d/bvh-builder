@@ -62,7 +62,7 @@ inline int wrapper(int type, void *data) {
 
 #define NUM_THREADS 16
 #define NUM_TASKS 8'192
-inline thread_pool<wrapper, NUM_THREADS, NUM_TASKS, pool_type::vyukov_buffer_idle> worker_pool{};
+inline thread_pool<wrapper, NUM_THREADS, NUM_TASKS, pool_type::vyukov_idle> worker_pool{};
 
 #define POOL_SIZE 100'000'000
 inline bump_pool<char, POOL_SIZE, mp_type::thread_safe> memory_pool{};

@@ -154,6 +154,24 @@ Multi-threaded execution had a drastic impact on throughput, with
 memory pooling offering modest but noticeable speedups due to the
 compute-bound nature of the problem.
 
+### Impact on thread-pool variants
+
+All BVH4 benchmarks were run on Ryzen 7 8845HS [Input model used was the
+Stanford Dragon (~870k tri)](https://graphics.stanford.edu/data/3Dscanrep).
+Measurements were repeated 1000 times. Daemon startup time **NOT** included.
+
+| Name | Avg Time ± S.D. (ms) | Throughput (M tris/sec) | Speedup (x) |
+| ---- | -------------------- | ----------------------- | ----------- |
+| mutex (baseline) | 41.7 ± 1.3 | 20.86 ± 0.65 | **1.00** |
+| vyukov (spin) | 26.4 ± 1.3 | 32.95 ± 1.62 | **1.58** |
+| vyukov (idle) | 26.4 ± 1.3 | 32.95 ± 1.62 | **1.58** |
+| work stealing | 26.5 ± 1.3 | 32.83 ± 1.61 | **1.57** |
+
+The work stealing and Vyukov variants both offer significant speedups of over
+**50** compared to the mutex variant, however variations in performance between
+the fastest implementations are negligible, likely since the thread pool is no
+longer the limiting factor to computation.
+
 ## AI Usage
 
 AI was used to generate the 2 scripts under `scripts`, `conv_obj.cpp` and
@@ -162,7 +180,7 @@ useful for converting popular file formats for benchmark geometry.
 
 ## Limitations
 
-- Output has NOT been validated for real applications usage. See issue #12
+- Output has NOT been validated in real applications usage. See issue #12
 
 - No output quality benchmark tool developed
 
