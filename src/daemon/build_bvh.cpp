@@ -260,6 +260,7 @@ int build_bvh(const char *buffer, char *output_buffer, const uint32_t size_in, u
 #endif
 
 	bvh_node *root = reinterpret_cast<bvh_node*>(memory_pool.alloc(sizeof(bvh_node), alignof(bvh_node)));
+	if (root == nullptr) return -ERR_BUILD_BAD_ALLOC;
 	root->tris = tris; root->tris_len = tris_len; root->max = max; root->min = min;
 	std::atomic<uint32_t> nodes_len = 0;
 

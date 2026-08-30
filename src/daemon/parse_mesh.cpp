@@ -21,6 +21,7 @@ int parse_mesh(const char *buffer, const uint32_t size, // number of BYTES in da
 	if (verts_len < 3 || sizeof(verts_len) + verts_len * sizeof(vec<3>) + sizeof(tris_len) >= size) return -ERR_PARSE_VERTS_LEN;
 
 	verts = reinterpret_cast<vec<3>*>(memory_pool.alloc(verts_len * sizeof(vec<3>), alignof(vec<3>)));
+	if (verts == nullptr) return -ERR_PARSE_BAD_ALLOC;
 	ptr += sizeof(verts_len);
 
 	memcpy(verts, ptr, sizeof(vec<3>) * verts_len);
@@ -37,6 +38,7 @@ int parse_mesh(const char *buffer, const uint32_t size, // number of BYTES in da
 
 	// tris_len = number of triangles in tris. each triangle is 3 ints
 	tris = reinterpret_cast<vec<3, uint32_t>*>(memory_pool.alloc(tris_len * sizeof(vec<3, uint32_t>), alignof(vec<3, uint32_t>)));
+	if (tris == nullptr) return -ERR_PARSE_BAD_ALLOC;
 	memcpy(tris, ptr, tris_len * sizeof(vec<3, uint32_t>));
 	return 0;
 }
