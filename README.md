@@ -23,7 +23,7 @@ in C++23. Tested on x86-64 Linux.
 
 - **Persistent resource management** via **socket IPC**
 
-- Average **30M tris/sec** end-to-end throughput on Ryzen 7 8845HS
+- Average **40M tris/sec** end-to-end throughput on Ryzen 7 8845HS
 (included socket IPC and mesh input parsing)
 
 ## Architecture Diagrams
@@ -129,12 +129,13 @@ reviewed during refactors.
 
 ### End-to-End
 
-All BVH4 benchmarks below were run on Ryzen 7 8845HS (8C/16T).
+All BVH4 benchmarks below were run on Ryzen 7 8845HS (8C/16T),
+using the Chase-Lev inspired work-stealing thread pool implementation.
 Measurements were repeated 1000 times. Daemon startup time **NOT** included
 
 | Name | Tris | Avg Time ± S.D. (ms) | Throughput (M tris/sec) |
-| --------------- | --------------- | --------------- | --------------- |
-| [Stanford Dragon](https://graphics.stanford.edu/data/3Dscanrep/) | ~870k | 26.4 ± 1.3 | 32.95 ± 1.62 |
+| ---- | ---- | -------------------- | ----------------------- |
+| [Stanford Dragon](https://graphics.stanford.edu/data/3Dscanrep/) | ~870k | 21.2 ± 1.5 | 41.04 ± 2.91 |
 
 ### Impact on custom resource pools
 
@@ -147,8 +148,8 @@ Memory-pool replaced ALL heap allocations (new/delete) in respective variants.
 | ---- | -------------------- | ----------------------- | ----------- |
 | 1T + new/delete (baseline) | 54.0 ± 1.6 | 16.11 ± 0.46 | **1.00** |
 | 1T + memory-pool | 53.1 ± 1.5 | 16.38 ± 0.46 | **1.02** |
-| 16T + new/delete | 27.2 ± 1.3 | 31.99 ± 1.53 | **1.98** |
-| 16T + memory-pool | 26.4 ± 1.3 | 32.95 ± 1.62 | **2.05** |
+| 16T + new/delete | 22.0 ± 1.5 | 39.55 ± 2.69 | **2.45** |
+| 16T + memory-pool | 21.2 ± 1.5 | 41.04 ± 2.91 | **2.55** |
 
 Multi-threaded execution had a drastic impact on throughput, with
 memory pooling offering modest but noticeable speedups due to the
@@ -156,21 +157,22 @@ compute-bound nature of the problem.
 
 ### Impact on thread-pool variants
 
-All BVH4 benchmarks were run on Ryzen 7 8845HS [Input model used was the
+All BVH4 benchmarks were run on Ryzen 7 8845HS. [Input model used was the
 Stanford Dragon (~870k tri)](https://graphics.stanford.edu/data/3Dscanrep).
 Measurements were repeated 1000 times. Daemon startup time **NOT** included.
 
 | Name | Avg Time ± S.D. (ms) | Throughput (M tris/sec) | Speedup (x) |
 | ---- | -------------------- | ----------------------- | ----------- |
-| mutex (baseline) | 41.7 ± 1.3 | 20.86 ± 0.65 | **1.00** |
-| vyukov (spin) | 26.4 ± 1.3 | 32.95 ± 1.62 | **1.58** |
-| vyukov (idle) | 26.4 ± 1.3 | 32.95 ± 1.62 | **1.58** |
-| work stealing | 26.5 ± 1.3 | 32.83 ± 1.61 | **1.57** |
+| mutex (baseline) | 41.8 ± 1.4 | 20.81 ± 0.70 | **1.00** |
+| vyukov (spin) | 24.5 ± 1.6 | 35.51 ± 2.32 | **1.71** |
+| vyukov (idle) | 25.1 ± 1.7 | 34.66 ± 2.35 | **1.67** |
+| work stealing | 21.2 ± 1.5 | 41.04 ± 2.91 | **1.97** |
 
-The work stealing and Vyukov variants both offer significant speedups of over
-**50** compared to the mutex variant, however variations in performance between
-the fastest implementations are negligible, likely since the thread pool is no
-longer the limiting factor to computation.
+The results above clearly show that **contention** is the biggest bottleneck
+in concurrency strategies in this application. The mutex baseline forces many
+workers to contend over the same global lock, while the other implementations
+are more decentralised in nature. Once lock contention was reduced, performance
+gains plateaued indicating the problem became increasingly compute-bound.
 
 ## AI Usage
 
