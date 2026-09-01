@@ -1,0 +1,8 @@
+#!/bin/bash
+
+if [ $# -ne 1 ]; then
+	printf "Unexpected number of arguments: %d\n" $#
+	exit 1
+fi
+
+rm -rf "build/$1" && cmake --preset $1 && cmake --build --preset $1 && cp build/test_input/ro_src/test.mesh "build/$1/"
