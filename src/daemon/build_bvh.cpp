@@ -258,6 +258,7 @@ int build_bvh(const char *buffer, char *output_buffer, const uint32_t size_in, u
 	if (success < 0) { memory_pool.free(); return success; }
 
 #ifndef NDEBUG
+	std::cout << "Parse mesh succeeded" << std::endl;
 	auto e_mesh = std::chrono::high_resolution_clock::now();
 #endif
 
@@ -274,6 +275,7 @@ int build_bvh(const char *buffer, char *output_buffer, const uint32_t size_in, u
 	if (success < 0) { memory_pool.free(); return success; }
 
 #ifndef NDEBUG
+	std::cout << "Build bvh succeeded" << std::endl;
 	auto e_bvh = std::chrono::high_resolution_clock::now();
 #endif
 
@@ -291,6 +293,7 @@ int build_bvh(const char *buffer, char *output_buffer, const uint32_t size_in, u
 	if (success < 0) { memory_pool.free(); return success; }
 
 #ifndef NDEBUG
+	std::cout << "Output bvh succeeded" << std::endl;
 	auto e_out = std::chrono::high_resolution_clock::now();
 #endif
 
