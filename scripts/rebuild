@@ -1,8 +1,10 @@
 #!/bin/bash
 
-if [ $# -ne 1 ]; then
-	printf "Unexpected number of arguments: %d\n" $#
+if [ $# -lt 1 ]; then
+	printf "Need at least 1 argument\n" $#
 	exit 1
 fi
 
-rm -rf "build/$1" && cmake --preset $1 && cmake --build --preset $1 && cp build/test_input/ro_src/test.mesh "build/$1/"
+for arg in "$@"; do
+	(rm -rf "build/$1" && cmake --preset $1 && cmake --build --preset $1 && cp build/test_input/ro_src/test.mesh "build/$1/") || printf "\nUnknown preset: %s\n" $arg
+done
