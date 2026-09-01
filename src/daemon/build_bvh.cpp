@@ -125,6 +125,7 @@ int build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint32_t> *nodes_l
 		tasks  [i].args = std::make_tuple(WRAPPER_TYPE_BUILD, static_cast<void*>(args+i));
 		tasks  [i].is_result_ready = false;
 		tasks  [i].result = 0;
+		tasks  [i].reset_flag();
 		results[i] = worker_pool.try_submit(tasks + i);
 	}
 
@@ -206,6 +207,7 @@ int output_bvh_node(bvh_node *curr_node, vec<3, uint32_t> *root_tris, char *bvh_
 			tasks  [i].args = std::make_tuple(WRAPPER_TYPE_OUTPUT, static_cast<void*>(args+i));
 			tasks  [i].is_result_ready = false;
 			tasks  [i].result = 0;
+			tasks  [i].reset_flag();
 			results[i] = worker_pool.try_submit(tasks + i);
 		}
 
