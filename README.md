@@ -59,7 +59,7 @@ flowchart LR
 ### Why a daemon?
 
 A **client-daemon** model was used to improve resource utilization
-over long periods of usage. If this was wrapped in an one-shot executable
+over long periods of usage. If this was wrapped in a one-shot executable
 or API call, thread and memory pools would have to be created and destroyed
 for each client request, reducing throughput.
 
