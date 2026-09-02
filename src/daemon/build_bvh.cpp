@@ -281,7 +281,7 @@ int build_bvh(const char *buffer, char *output_buffer, const uint32_t size_in, u
 
 	char *ptr = output_buffer;
 
-	// Last use of ptr
+	memcpy(ptr += tris_len * sizeof(vec<3, uint32_t>), tris, tris_len * sizeof(vec<3, uint32_t>));
 	memcpy(ptr, &nodes_len, sizeof(nodes_len));
 
 #ifndef NDEBUG
@@ -297,7 +297,7 @@ int build_bvh(const char *buffer, char *output_buffer, const uint32_t size_in, u
 	auto e_out = std::chrono::high_resolution_clock::now();
 #endif
 
-	*size_out = sizeof(nodes_len) + nodes_len * sizeof(bvh_node_serialised);
+	*size_out = tris_len * sizeof(vec<3, uint32_t>) + sizeof(nodes_len) + nodes_len * sizeof(bvh_node_serialised);
 
 	memory_pool.free();
 

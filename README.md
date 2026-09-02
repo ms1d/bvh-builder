@@ -23,7 +23,7 @@ in C++23. Tested on x86-64 Linux.
 
 - **Persistent resource management** via **socket IPC**
 
-- Average **40M tris/sec** end-to-end throughput on Ryzen 7 8845HS
+- Average **35M tris/sec** end-to-end throughput on Ryzen 7 8845HS
 (included socket IPC and mesh input parsing)
 
 ## Architecture Diagrams
@@ -121,6 +121,8 @@ reviewed during refactors.
 
 ### Output Format
 
+- `vec<3 uint32_t> *sorted_tris` (sorted after BVH processing)
+
 - `uint32_t nodes_len` (number of nodes in `nodes`)
 
 - `bvh_node_serialised *nodes` (see `include/structs.hpp`)
@@ -135,7 +137,7 @@ Measurements were repeated 1000 times. Daemon startup time **NOT** included
 
 | Name | Tris | Avg Time ± S.D. (ms) | Throughput (M tris/sec) |
 | ---- | ---- | -------------------- | ----------------------- |
-| [Stanford Dragon](https://graphics.stanford.edu/data/3Dscanrep/) | ~870k | 21.2 ± 1.5 | 41.04 ± 2.91 |
+| [Stanford Dragon](https://graphics.stanford.edu/data/3Dscanrep/) | ~870k | 24.7 ± 1.5 | 35.22 ± 2.14 |
 
 ### Impact on custom resource pools
 
@@ -146,10 +148,10 @@ Memory-pool replaced ALL heap allocations (new/delete) in respective variants.
 
 | Name | Avg Time ± S.D. (ms) | Throughput (M tris/sec) | Speedup (x) |
 | ---- | -------------------- | ----------------------- | ----------- |
-| 1T + new/delete (baseline) | 54.0 ± 1.6 | 16.11 ± 0.46 | **1.00** |
-| 1T + memory-pool | 53.1 ± 1.5 | 16.38 ± 0.46 | **1.02** |
-| 16T + new/delete | 22.0 ± 1.5 | 39.55 ± 2.69 | **2.45** |
-| 16T + memory-pool | 21.2 ± 1.5 | 41.04 ± 2.91 | **2.55** |
+| 1T + new/delete (baseline) | 57.5 ± 1.6 | 15.13 ± 0.42 | **1.00** |
+| 1T + memory-pool | 56.6 ± 1.5 | 15.37 ± 0.41 | **1.02** |
+| 16T + new/delete | 25.5 ± 1.5 | 34.12 ± 2.01 | **2.25** |
+| 16T + memory-pool | 24.7 ± 1.5 | 35.22 ± 2.14 | **2.33** |
 
 Multi-threaded execution had a drastic impact on throughput, with
 memory pooling offering modest but noticeable speedups due to the
@@ -163,10 +165,10 @@ Measurements were repeated 1000 times. Daemon startup time **NOT** included.
 
 | Name | Avg Time ± S.D. (ms) | Throughput (M tris/sec) | Speedup (x) |
 | ---- | -------------------- | ----------------------- | ----------- |
-| mutex (baseline) | 41.8 ± 1.4 | 20.81 ± 0.70 | **1.00** |
-| vyukov (spin) | 24.5 ± 1.6 | 35.51 ± 2.32 | **1.71** |
-| vyukov (idle) | 25.1 ± 1.7 | 34.66 ± 2.35 | **1.67** |
-| work stealing | 21.2 ± 1.5 | 41.04 ± 2.91 | **1.97** |
+| mutex (baseline) | 45.3 ± 1.4 | 19.21 ± 0.59 | **1.00** |
+| vyukov (spin) | 28.0 ± 1.6 | 31.07 ± 1.78 | **1.62** |
+| vyukov (idle) | 28.6 ± 1.7 | 30.42 ± 1.81 | **1.58** |
+| work stealing | 24.7 ± 1.5 | 35.22 ± 2.14 | **1.83** |
 
 The results above clearly show that **contention** is the biggest bottleneck
 in concurrency strategies in this application. The mutex baseline forces many
