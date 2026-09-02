@@ -6,5 +6,5 @@ if [ $# -lt 1 ]; then
 fi
 
 for arg in "$@"; do
-	(rm -rf "build/$arg" && cmake --preset $arg && cmake --build --preset $arg && cp build/test_input/ro_src/test.mesh "build/$arg/") || printf "\nUnknown preset: %s\n" $arg
+	(rm -rf "build/$arg" && cmake --preset $arg && cmake --build --preset $arg && cp build/test_input/ro_src/test.mesh "build/$arg/") || printf "\nError with preset: %s\n" $arg
 done
