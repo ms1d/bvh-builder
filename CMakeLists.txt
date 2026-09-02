@@ -4,61 +4,44 @@ project(bvh-builder)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+include(FetchContent)
+
+set(MY_DEPS
+    veclib
+    commonlib
+    thread-poollib
+    memory-poollib
+)
+
+foreach(dep IN LISTS MY_DEPS)
+    FetchContent_Declare(
+        ${dep}
+        GIT_REPOSITORY https://github.com/ms1d/${dep}
+        GIT_TAG main
+    )
+endforeach()
+
+FetchContent_MakeAvailable(${MY_DEPS})
+
+if(USE_ASAN)
+	add_compile_options(-fsanitize=address,undefined)
+	add_link_options(-fsanitize=address,undefined)
+elseif(USE_TSAN)
+	add_compile_options(-fsanitize=thread)
+	add_link_options(-fsanitize=thread)
+endif()
+
+if(ADD_SYMBOLS)
+	add_compile_options(-g)
+	add_link_options(-g)
+endif()
+
 file(GLOB CLIENT_SRC src/client/*.cpp)
 add_executable(bvh-builder ${CLIENT_SRC})
 
 file(GLOB DAEMON_SRC src/daemon/*.cpp)
 add_executable(bvh-builderd ${DAEMON_SRC})
 
-include(FetchContent)
-
-FetchContent_Declare(
-    veclib
-    GIT_REPOSITORY https://github.com/ms1d/veclib
-	GIT_TAG main
-)
-
-FetchContent_Declare(
-    commonlib
-    GIT_REPOSITORY https://github.com/ms1d/commonlib
-	GIT_TAG main
-)
-
-FetchContent_Declare(
-    thread-poollib
-    GIT_REPOSITORY https://github.com/ms1d/thread-poollib
-	GIT_TAG main
-)
-
-FetchContent_Declare(
-	memory-poollib
-	GIT_REPOSITORY https://github.com/ms1d/memory-poollib
-	GIT_TAG main
-)
-
-FetchContent_MakeAvailable(veclib commonlib thread-poollib memory-poollib)
-
 target_link_libraries(bvh-builderd PRIVATE veclib thread-poollib memory-poollib)
 target_include_directories(bvh-builderd PRIVATE include)
 target_include_directories(bvh-builder PRIVATE include)
-
-if (USE_ASAN)
-	target_compile_options(bvh-builder PRIVATE -fsanitize=address,undefined)
-	target_compile_options(bvh-builderd PRIVATE -fsanitize=address,undefined)
-    target_link_options(bvh-builder PRIVATE -fsanitize=address,undefined)
-    target_link_options(bvh-builderd PRIVATE -fsanitize=address,undefined)
-endif()
-
-if (USE_TSAN)
-	target_compile_options(bvh-builder PRIVATE -fsanitize=thread)
-	target_compile_options(bvh-builderd PRIVATE -fsanitize=thread)
-    target_link_options(bvh-builder PRIVATE -fsanitize=thread)
-    target_link_options(bvh-builderd PRIVATE -fsanitize=thread)
-endif()
-
-if (ADD_SYMBOLS)
-	target_compile_options(bvh-builder PRIVATE -g)
-	target_compile_options(bvh-builderd PRIVATE -g)
-    target_link_options(bvh-builder PRIVATE -g)
-    target_link_options(bvh-builderd PRIVATE -g)
-endif()

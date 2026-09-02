@@ -37,11 +37,12 @@
 			"name": "rel-base",
 			"hidden": true,
 			"generator": "Ninja",
+			"binaryDir": "build/rel",
 			"cacheVariables": {
 				"CMAKE_EXPORT_COMPILE_COMMANDS": "OFF",
 				"CMAKE_UNITY_BUILD": "ON",
 				"BUILD_TESTS": "OFF",
-				"CMAKE_CXX_FLAGS": "-O3 -DNDEBUG -flto=auto -fuse-ld=gold -mf16c",
+				"CMAKE_CXX_FLAGS": "-O3 -DNDEBUG -flto=auto -fuse-ld=gold -mf16c -march=native",
 				"CMAKE_BUILD_TYPE": "Release"
 			}
 		},
@@ -49,8 +50,7 @@
 		{
 			"name": "rel",
 			"inherits": "rel-base",
-			"displayName": "Release",
-			"binaryDir": "build/rel"
+			"displayName": "Release"
 		},
 
 		{
