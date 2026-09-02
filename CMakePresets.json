@@ -1,57 +1,65 @@
 {
-	"version": 3,
+	"version": 6,
 	"configurePresets": [
 		{
-			"name": "dev",
-			"displayName": "Development",
+			"name": "dev-base",
+			"hidden": true,
 			"generator": "Ninja",
-			"binaryDir": "build/dev",
 			"cacheVariables": {
 				"CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+				"CMAKE_UNITY_BUILD": "OFF",
 				"BUILD_TESTS": "OFF",
-				"CMAKE_CXX_FLAGS": "-g -Wall -Wextra -Wpedantic -Wshadow -Wnull-dereference -Wconversion -O0 -fuse-ld=gold -fsanitize=address,undefined -mf16c",
-				"CMAKE_UNITY_BUILD": "OFF"
+				"CMAKE_CXX_FLAGS": "-g -Wall -Wextra -Wpedantic -Wshadow -Wnull-dereference -Wconversion -O0 -fuse-ld=gold -mf16c",
+				"CMAKE_BUILD_TYPE": "Debug"
+			}
+		},
+		{
+			"name": "dev",
+			"inherits": "dev-base",
+			"displayName": "Development (asan)",
+			"binaryDir": "build/dev",
+			"cacheVariables": {
+				"USE_ASAN": "ON"
 			}
 		},
 
 		{
-			"name": "dev-thread",
-			"displayName": "Development (-fsanitize=thread)",
-			"generator": "Ninja",
-			"binaryDir": "build/dev-thread",
+			"name": "dev-tsan",
+			"inherits": "dev-base",
+			"displayName": "Development (tsan)",
+			"binaryDir": "build/dev-tsan",
 			"cacheVariables": {
-				"CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+				"USE_TSAN": "ON"
+			}
+		},
+
+		{
+			"name": "rel-base",
+			"hidden": true,
+			"generator": "Ninja",
+			"cacheVariables": {
+				"CMAKE_EXPORT_COMPILE_COMMANDS": "OFF",
+				"CMAKE_UNITY_BUILD": "ON",
 				"BUILD_TESTS": "OFF",
-				"CMAKE_CXX_FLAGS": "-g -Wall -Wextra -Wpedantic -Wshadow -Wnull-dereference -Wconversion -O0 -fuse-ld=gold -fsanitize=thread -mf16c",
-				"CMAKE_UNITY_BUILD": "OFF"
+				"CMAKE_CXX_FLAGS": "-O3 -DNDEBUG -flto=auto -fuse-ld=gold -mf16c",
+				"CMAKE_BUILD_TYPE": "Release"
 			}
 		},
 
 		{
 			"name": "rel",
+			"inherits": "rel-base",
 			"displayName": "Release",
-			"generator": "Ninja",
-			"binaryDir": "build/rel",
-			"cacheVariables": {
-				"CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-				"CMAKE_BUILD_TYPE": "Release",
-				"BUILD_TESTS": "OFF",
-				"CMAKE_CXX_FLAGS": "-O3 -DNDEBUG -flto=auto -fuse-ld=gold -mf16c",
-				"CMAKE_UNITY_BUILD": "ON"
-			}
+			"binaryDir": "build/rel"
 		},
 
 		{
 			"name": "prf",
-			"displayName": "profile",
-			"generator": "Ninja",
+			"inherits": "rel-base",
+			"displayName": "Profile",
 			"binaryDir": "build/prf",
 			"cacheVariables": {
-				"CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-				"CMAKE_BUILD_TYPE": "Release",
-				"BUILD_TESTS": "OFF",
-				"CMAKE_CXX_FLAGS": "-O3 -DNDEBUG -flto=auto -fuse-ld=gold -g -mf16c",
-				"CMAKE_UNITY_BUILD": "ON"
+				"ADD_SYMBOLS": "ON"
 			}
 		}
 	],
@@ -66,8 +74,8 @@
 			"configurePreset": "dev"
 		},
 		{
-			"name": "dev-thread",
-			"configurePreset": "dev-thread"
+			"name": "dev-tsan",
+			"configurePreset": "dev-tsan"
 		},
 		{
 			"name": "prf",
