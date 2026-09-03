@@ -10,6 +10,7 @@
 #define WRAPPER_TYPE_BUILD 0
 #define WRAPPER_TYPE_OUTPUT 1
 #define WRAPPER_TYPE_FIND 2
+#define WRAPPER_TYPE_FREE 3
 
 
 
@@ -35,6 +36,19 @@ struct find_min_max_verts_args {
 	vec<3> *min_out;
 };
 
+struct free_args {
+	std::atomic<bool> *flag;
+};
+
+inline int wrapper(int type, void *data);
+
+#define NUM_THREADS 16
+#define NUM_TASKS 8'192
+inline thread_pool<wrapper, NUM_THREADS, NUM_TASKS, pool_type::work_stealing> worker_pool{};
+
+#define POOL_SIZE 20'000'000
+thread_local inline bump_pool<char, POOL_SIZE, mp_type::thread_unsafe> memory_pool{};
+
 inline int wrapper(int type, void *data) {
 	switch (type) {
 		case WRAPPER_TYPE_BUILD: {
@@ -53,16 +67,14 @@ inline int wrapper(int type, void *data) {
 			return 0;
 			break;
 		}
+		case WRAPPER_TYPE_FREE: {
+			auto args = static_cast<free_args*>(data);
+			args->flag->wait(false, std::memory_order_relaxed);
+			memory_pool.free();
+			return 0;
+			break;
+		}
 		default:
 			assert(false && "Invalid wrapper type");
 	}
 }
-
-
-
-#define NUM_THREADS 16
-#define NUM_TASKS 8'192
-inline thread_pool<wrapper, NUM_THREADS, NUM_TASKS, pool_type::work_stealing> worker_pool{};
-
-#define POOL_SIZE 100'000'000
-inline bump_pool<char, POOL_SIZE, mp_type::thread_safe> memory_pool{};

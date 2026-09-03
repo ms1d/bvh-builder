@@ -176,6 +176,10 @@ workers to contend over the same global lock, while the other implementations
 are more decentralised in nature. Once lock contention was reduced, performance
 gains plateaued indicating the problem became increasingly compute-bound.
 
+### Impact on thread-local memory pools
+
+To be written up in future
+
 ## AI Usage
 
 AI was used to generate the 2 scripts under `scripts`, `conv_obj.cpp` and

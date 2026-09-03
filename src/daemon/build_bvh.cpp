@@ -300,6 +300,14 @@ int build_bvh(const char *buffer, char *output_buffer, const uint32_t size_in, u
 	*size_out = tris_len * sizeof(vec<3, uint32_t>) + sizeof(nodes_len) + nodes_len * sizeof(bvh_node_serialised);
 
 	memory_pool.free();
+	std::atomic<bool> flag = false;
+	free_args args{ &flag };
+	auto task = tp_task<wrapper>(WRAPPER_TYPE_FREE, &args);
+	for (uint32_t i = 0; i < NUM_THREADS; i++) {
+		worker_pool.submit(&task);
+	}
+	flag.store(true, std::memory_order_relaxed);
+	flag.notify_all();
 
 #ifndef NDEBUG
 	auto e = std::chrono::high_resolution_clock::now();
