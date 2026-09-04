@@ -61,7 +61,7 @@ int main(void) {
 
 	while (1) {
 		int client_fd = accept(fd, NULL, NULL);
-
+		if (client_fd < 0) break;
 #ifndef NDEBUG
 		printf("server: accepted\n");
 #endif
