@@ -129,6 +129,13 @@ reviewed during refactors.
 
 ## Benchmarks
 
+### Note
+
+Note: The benchmarks below reflect an earlier version of the thread pool
+implementation. Subsequent scheduling optimisations have improved performance,
+making these results outdated for absolute throughput comparison but still useful
+for identifying application bottlenecks and understanding optimisation decisions.
+
 ### End-to-End
 
 All BVH4 benchmarks below were run on Ryzen 7 8845HS (8C/16T),
