@@ -23,7 +23,7 @@ in C++23. Tested on x86-64 Linux.
 
 - **Persistent resource management** via **socket IPC**
 
-- Average **35M tris/sec** end-to-end throughput on Ryzen 7 8845HS
+- Average **35M+ tris/sec** end-to-end throughput on Ryzen 7 8845HS
 (included socket IPC and mesh input parsing)
 
 ## Architecture Diagrams
@@ -135,6 +135,8 @@ Note: The benchmarks below reflect an earlier version of the thread pool
 implementation. Subsequent scheduling optimisations have improved performance,
 making these results outdated for absolute throughput comparison but still useful
 for identifying application bottlenecks and understanding optimisation decisions.
+Recent benchmarks suggest an improved throughput of 40M tris/sec, but I plan to
+write it up when the project has matured.
 
 ### End-to-End
 
