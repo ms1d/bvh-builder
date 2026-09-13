@@ -148,7 +148,7 @@ Measurements were repeated 1000 times. Daemon startup time **NOT** included
 | ---- | ---- | -------------------- | ----------------------- |
 | [Stanford Dragon](https://graphics.stanford.edu/data/3Dscanrep/) | ~870k | 24.7 ± 1.5 | 35.22 ± 2.14 |
 
-### Impact on custom resource pools
+### Impact of custom resource pools
 
 All BVH4 benchmarks below were run on Ryzen 7 8845HS. [Input model used was the
 Stanford Dragon (~870k tri)](https://graphics.stanford.edu/data/3Dscanrep).
@@ -166,7 +166,7 @@ Multi-threaded execution had a drastic impact on throughput, with
 memory pooling offering modest but noticeable speedups due to the
 compute-bound nature of the problem.
 
-### Impact on thread-pool variants
+### Impact of thread-pool variants
 
 All BVH4 benchmarks were run on Ryzen 7 8845HS. [Input model used was the
 Stanford Dragon (~870k tri)](https://graphics.stanford.edu/data/3Dscanrep).
@@ -185,9 +185,17 @@ workers to contend over the same global lock, while the other implementations
 are more decentralised in nature. Once lock contention was reduced, performance
 gains plateaued indicating the problem became increasingly compute-bound.
 
-### Impact on thread-local memory pools
+### (PLANNED) Impact on thread-local memory pools
 
-To be written up in future
+> To be written up in future
+
+### (PLANNED) Impact on client-daemon architecture
+
+> To be written up in future
+
+### (PLANNED) Impact on number of threads
+
+> To be written up in future
 
 ## AI Usage
 
