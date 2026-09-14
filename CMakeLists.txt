@@ -10,18 +10,23 @@ set(MY_DEPS
     veclib
     commonlib
     thread-poollib
-    memory-poollib
 )
 
 foreach(dep IN LISTS MY_DEPS)
     FetchContent_Declare(
         ${dep}
         GIT_REPOSITORY https://github.com/ms1d/${dep}
-        GIT_TAG main
+        GIT_TAG v1.0.0
     )
 endforeach()
 
-FetchContent_MakeAvailable(${MY_DEPS})
+FetchContent_Declare(
+	memory-poollib
+	GIT_REPOSITORY https://github.com/ms1d/memory-poollib
+	GIT_TAG v0.1.0
+)
+
+FetchContent_MakeAvailable(${MY_DEPS} memory-poollib)
 
 if(USE_ASAN)
 	add_compile_options(-fsanitize=address,undefined)
