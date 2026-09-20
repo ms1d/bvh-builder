@@ -42,12 +42,39 @@ struct free_args {
 
 inline int wrapper(int type, void *data);
 
+#ifndef NUM_THREADS
 #define NUM_THREADS 16
-#define NUM_TASKS 8'192
-inline thread_pool<wrapper, NUM_THREADS, NUM_TASKS, pool_type::work_stealing> worker_pool{};
+#endif
 
+#ifndef NUM_TASKS
+#define NUM_TASKS 8'192
+#endif
+
+#ifndef TP_TYPE
+#define TP_TYPE work_stealing
+#endif
+
+inline thread_pool<wrapper, NUM_THREADS, NUM_TASKS, pool_type::TP_TYPE> worker_pool{};
+
+#ifndef POOL_SIZE
 #define POOL_SIZE 20'000'000
-thread_local inline bump_pool<char, POOL_SIZE, mp_type::thread_unsafe> memory_pool{};
+#endif
+
+#ifndef MP_TYPE
+#define MP_TYPE bump_pool
+#endif
+
+#ifndef MP_SCOPE
+#define MP_SCOPE 0 // 0 = local, 1 = global
+#endif
+
+#if MP_SCOPE == 0
+thread_local inline MP_TYPE<char, POOL_SIZE, mp_type::thread_unsafe> memory_pool{};
+#elif MP_SCOPE == 1
+inline MP_TYPE<char, POOL_SIZE, mp_type::thread_safe> memory_pool{};
+#else
+static_assert(false, "INVALID MP_SCOPE - '0' (local) OR '1' (global) ONLY");
+#endif
 
 inline int wrapper(int type, void *data) {
 	switch (type) {
@@ -67,6 +94,7 @@ inline int wrapper(int type, void *data) {
 			return 0;
 			break;
 		}
+#if MP_SCOPE == 0
 		case WRAPPER_TYPE_FREE: {
 			auto args = static_cast<free_args*>(data);
 			args->flag->wait(false, std::memory_order_relaxed);
@@ -74,6 +102,7 @@ inline int wrapper(int type, void *data) {
 			return 0;
 			break;
 		}
+#endif
 		default:
 			assert(false && "Invalid wrapper type");
 	}
