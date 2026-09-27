@@ -6,13 +6,13 @@
 
 
 
-int parse_mesh(const char *buffer, const uint32_t size, // number of BYTES in data
+int parse_mesh(const char *input_buffer, const uint32_t size, // number of BYTES in data
 		vec<3, uint32_t> *&tris, uint32_t &tris_len,
 		vec<3> *&verts, uint32_t &verts_len,
 		vec<3> &max, vec<3> &min) {
 
 
-	const char *__restrict ptr = buffer;
+	const char *__restrict ptr = input_buffer;
 
 	memcpy(&verts_len, ptr, sizeof(verts_len));
 
@@ -20,8 +20,13 @@ int parse_mesh(const char *buffer, const uint32_t size, // number of BYTES in da
 	// Need verts_len to not be too big (allow space for tris_len)
 	if (verts_len < 3 || sizeof(verts_len) + verts_len * sizeof(vec<3>) + sizeof(tris_len) >= size) return -ERR_PARSE_VERTS_LEN;
 
+#if MP_SCOPE != MP_SCOPE_MALLOC
 	verts = reinterpret_cast<vec<3>*>(memory_pool.alloc(verts_len * sizeof(vec<3>), alignof(vec<3>)));
 	if (verts == nullptr) return -ERR_PARSE_BAD_ALLOC;
+#else
+	verts = new vec<3>[verts_len];
+#endif
+
 	ptr += sizeof(verts_len);
 
 	memcpy(verts, ptr, sizeof(vec<3>) * verts_len);
@@ -34,11 +39,19 @@ int parse_mesh(const char *buffer, const uint32_t size, // number of BYTES in da
 
 	ptr += 4;
 
-	if (verts_len * sizeof(vec<3>) + tris_len * sizeof(vec<3, uint32_t>) + sizeof(verts_len) + sizeof(tris_len) != size) return -ERR_PARSE_SIZE;
+	if (verts_len * sizeof(vec<3>) + tris_len * sizeof(vec<3, uint32_t>) + sizeof(verts_len) + sizeof(tris_len) != size) {
+		delete[] verts;
+		return -ERR_PARSE_SIZE;
+	}
 
 	// tris_len = number of triangles in tris. each triangle is 3 ints
+#if MP_SCOPE != MP_SCOPE_MALLOC
 	tris = reinterpret_cast<vec<3, uint32_t>*>(memory_pool.alloc(tris_len * sizeof(vec<3, uint32_t>), alignof(vec<3, uint32_t>)));
 	if (tris == nullptr) return -ERR_PARSE_BAD_ALLOC;
+#else
+	tris = new vec<3, uint32_t>[tris_len];
+#endif
+
 	memcpy(tris, ptr, tris_len * sizeof(vec<3, uint32_t>));
 	return 0;
 }

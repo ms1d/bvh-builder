@@ -65,41 +65,46 @@ inline thread_pool<wrapper, NUM_THREADS, NUM_TASKS, pool_type::TP_TYPE> worker_p
 #define MP_TYPE bump_pool
 #endif
 
+#define MP_SCOPE_LOCAL  0
+#define MP_SCOPE_GLOBAL 1
+#define MP_SCOPE_MALLOC 2
 #ifndef MP_SCOPE
-#define MP_SCOPE 0 // 0 = local, 1 = global
+#define MP_SCOPE MP_SCOPE_LOCAL
 #endif
 
-#if MP_SCOPE == 0
+#if MP_SCOPE == MP_SCOPE_LOCAL
 thread_local inline MP_TYPE<char, POOL_SIZE, mp_type::thread_unsafe> memory_pool{};
-#elif MP_SCOPE == 1
+#elif MP_SCOPE == MP_SCOPE_GLOBAL
 inline MP_TYPE<char, POOL_SIZE, mp_type::thread_safe> memory_pool{};
+#elif MP_SCOPE == MP_SCOPE_MALLOC
 #else
-static_assert(false, "INVALID MP_SCOPE - '0' (local) OR '1' (global) ONLY");
+static_assert(false, "INVALID MP_SCOPE - '0' (local) OR '1' (global) OR '2' (malloc) ONLY");
 #endif
 
-inline int wrapper(int type, void *data) {
+inline int wrapper(int type, void *data = nullptr) {
 	switch (type) {
 		case WRAPPER_TYPE_BUILD: {
+			assert(data != nullptr);
 			auto args = static_cast<build_bvh_node_args*>(data);
 			return build_bvh_node(args->node, args->verts, args->nodes_len);
 			break;
 		}
 		case WRAPPER_TYPE_OUTPUT: {
+			assert(data != nullptr);
 			auto args = static_cast<output_bvh_node_args*>(data);
 			return output_bvh_node(args->curr_node, args->root_tris, args->output_buffer, args->curr_bvh_pos, args->curr_node_index);
 			break;
 		}
 		case WRAPPER_TYPE_FIND: {
+			assert(data != nullptr);
 			auto args = static_cast<find_min_max_verts_args*>(data);
 			find_min_max_verts(args->verts, args->len, args->max_out, args->min_out);
 			return 0;
 			break;
 		}
-#if MP_SCOPE == 0
+#if MP_SCOPE == MP_SCOPE_LOCAL
 		case WRAPPER_TYPE_FREE: {
-			auto args = static_cast<free_args*>(data);
-			//args->flag->wait(false, std::memory_order_relaxed);
-			while (!args->flag->load(std::memory_order_relaxed));
+			assert(data == nullptr);
 			memory_pool.free();
 			return 0;
 			break;

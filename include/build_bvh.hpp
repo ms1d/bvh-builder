@@ -8,7 +8,7 @@
 
 
 
-int build_bvh(const char *buffer, char *output_buffer, const uint32_t size_in, uint32_t *size_out);
+int build_bvh(const char *input_buffer, const uint32_t size_in, int out_file_fd);
 
 int build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint32_t> *nodes_len);
 

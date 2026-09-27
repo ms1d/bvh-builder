@@ -3,6 +3,7 @@
 #include <cstring>
 #include <atomic>
 #include <iostream>
+#include <sys/mman.h>
 #include <tuple>
 #include <unistd.h>
 #include <immintrin.h>
@@ -68,8 +69,12 @@ int build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint32_t> *nodes_l
 	offset.data[longest_axis] /= CHILDREN_PER_NODE; offset.data[(longest_axis + 1) % 3] = 0; offset.data[(longest_axis + 2) % 3] = 0;
 
 	// 2 - Create new children
+#if MP_SCOPE != MP_SCOPE_MALLOC
 	node->children = reinterpret_cast<bvh_node*>(memory_pool.alloc(CHILDREN_PER_NODE * sizeof(bvh_node), alignof(bvh_node)));
 	if (node->children == nullptr) return -ERR_BUILD_BAD_ALLOC;
+#else
+	node->children = new bvh_node[CHILDREN_PER_NODE];
+#endif
 	vec<3, uint32_t> *front = node->tris, *back = node->tris + node->tris_len - 1;
 
 	for (uint32_t i = 0; i < CHILDREN_PER_NODE; i++) {
@@ -113,8 +118,13 @@ int build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint32_t> *nodes_l
 	// 3 - Recurse + await results
 
 	// Due to stack re-use during recursion, it is not safe to stack allocate task
+#if MP_SCOPE != MP_SCOPE_MALLOC
 	auto tasks = reinterpret_cast<tp_task<wrapper>*>(memory_pool.alloc((CHILDREN_PER_NODE-1) * sizeof(tp_task<wrapper>), alignof(tp_task<wrapper>)));
 	auto args = reinterpret_cast<build_bvh_node_args*>(memory_pool.alloc((CHILDREN_PER_NODE-1) * sizeof(build_bvh_node_args), alignof(build_bvh_node_args)));
+#else
+	auto tasks = new tp_task<wrapper>[CHILDREN_PER_NODE-1];
+	auto args = new build_bvh_node_args[CHILDREN_PER_NODE-1];
+#endif
 
 	bool results[CHILDREN_PER_NODE-1];
 	int errs[CHILDREN_PER_NODE];
@@ -123,9 +133,11 @@ int build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint32_t> *nodes_l
 	for (uint32_t i = 0; i < CHILDREN_PER_NODE-1; i++) {
 		args   [i] = build_bvh_node_args{ node->children + i, verts, nodes_len };
 		tasks  [i].args = std::make_tuple(WRAPPER_TYPE_BUILD, static_cast<void*>(args+i));
+#if MP_SCOPE != MP_SCOPE_MALLOC
 		tasks  [i].is_result_ready = false;
 		tasks  [i].result = 0;
 		tasks  [i].reset_flag();
+#endif
 		results[i] = worker_pool.try_submit(tasks + i);
 	}
 
@@ -143,6 +155,11 @@ int build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint32_t> *nodes_l
 			errs[i] = build_bvh_node(node->children + i, verts, nodes_len);
 		}
 	}
+
+#if MP_SCOPE == MP_SCOPE_MALLOC
+	delete[] args;
+	delete[] tasks;
+#endif
 
 	// ISSUE - if errors differ, the first one will be returned.
 	for (int i = 0; i < CHILDREN_PER_NODE; i++) if (errs[i] < 0) return errs[i];
@@ -194,8 +211,13 @@ int output_bvh_node(bvh_node *curr_node, vec<3, uint32_t> *root_tris, char *bvh_
 		curr_node_out.payload = first_index << 1;
 
 		// Due to stack re-use during recursion, it is not safe to stack allocate tasks
+#if MP_SCOPE != MP_SCOPE_MALLOC
 		auto tasks = reinterpret_cast<tp_task<wrapper>*>(memory_pool.alloc((CHILDREN_PER_NODE-1) * sizeof(tp_task<wrapper>), alignof(tp_task<wrapper>)));
 		auto args = reinterpret_cast<output_bvh_node_args*>(memory_pool.alloc((CHILDREN_PER_NODE-1) * sizeof(output_bvh_node_args), alignof(output_bvh_node_args)));
+#else
+		auto tasks = new tp_task<wrapper>[CHILDREN_PER_NODE-1];
+		auto args = new output_bvh_node_args[CHILDREN_PER_NODE-1];
+#endif
 
 		bool results[CHILDREN_PER_NODE-1];
 		int errs[CHILDREN_PER_NODE];
@@ -205,9 +227,11 @@ int output_bvh_node(bvh_node *curr_node, vec<3, uint32_t> *root_tris, char *bvh_
 		for (uint32_t i = 0; i < CHILDREN_PER_NODE-1; i++) {
 			args   [i] = output_bvh_node_args{ curr_node->children + i, root_tris, bvh_output_buffer, curr_bvh_pos, first_index + i };
 			tasks  [i].args = std::make_tuple(WRAPPER_TYPE_OUTPUT, static_cast<void*>(args+i));
+#if MP_SCOPE != MP_SCOPE_MALLOC // new keyword will construct these values for us
 			tasks  [i].is_result_ready = false;
 			tasks  [i].result = 0;
 			tasks  [i].reset_flag();
+#endif
 			results[i] = worker_pool.try_submit(tasks + i);
 		}
 
@@ -231,6 +255,11 @@ int output_bvh_node(bvh_node *curr_node, vec<3, uint32_t> *root_tris, char *bvh_
 			}
 		}
 
+#if MP_SCOPE == MP_SCOPE_MALLOC
+		delete[] tasks;
+		delete[] args;
+#endif
+
 		// ISSUE - if errors differ, the first one will be returned.
 		for (int i = 0; i < CHILDREN_PER_NODE; i++) if (errs[i] < 0) return errs[i];
 	}
@@ -241,76 +270,143 @@ int output_bvh_node(bvh_node *curr_node, vec<3, uint32_t> *root_tris, char *bvh_
 
 
 
-int build_bvh(const char *buffer, char *output_buffer, const uint32_t size_in, uint32_t *size_out) {
+#if MP_SCOPE != MP_SCOPE_MALLOC
+void free_memory() {
+#else
+void free_memory(bvh_node *node = nullptr, vec<3> *verts = nullptr, vec<3, uint32_t> *tris = nullptr) {
+#endif
+#if MP_SCOPE == MP_SCOPE_LOCAL
+	tp_task<wrapper> tasks[NUM_THREADS];
+	for (uint32_t i = 0; i < NUM_THREADS; i++) {
+		tasks[i].args = std::make_tuple(WRAPPER_TYPE_FREE, nullptr);
+		tasks[i].is_result_ready = false;
+		tasks[i].reset_flag();
+	}
+
+	for (uint32_t i = 0; i < NUM_THREADS; i++) {
+		worker_pool.submit(tasks + i);
+	}
+
+	memory_pool.free();
+
+	for (uint32_t i = 0; i < NUM_THREADS; i++) {
+		tasks[i].is_result_ready.wait(false, std::memory_order_relaxed);
+	}
+#elif MP_SCOPE == MP_SCOPE_MALLOC
+	if (verts) delete[] verts;
+	if (tris) delete[] tris;
+
+	if (!node->children) return;
+
+	for (uint32_t i = 0; i < CHILDREN_PER_NODE; i++) {
+		free_memory(node->children + i);
+	}
+
+	delete[] node->children;
+#endif
+}
+
+
+
+// Important - do NOT close out_file_fd here - the caller is responsible for it
+int build_bvh(const char *input_buffer, const uint32_t size_in, int out_file_fd) {
 #ifndef NDEBUG
 	auto s = std::chrono::high_resolution_clock::now();
 #endif
+
 
 	vec<3, uint32_t> *tris;
 	uint32_t verts_len, tris_len;
 	vec<3> *verts, max, min;
 
+
 #ifndef NDEBUG
 	auto s_mesh = std::chrono::high_resolution_clock::now();
 #endif
 
-	auto success = parse_mesh(buffer, size_in, tris, tris_len, verts, verts_len, max, min);
-	if (success < 0) { memory_pool.free(); return success; }
-
+	auto success = parse_mesh(input_buffer, size_in, tris, tris_len, verts, verts_len, max, min);
+	// if new/delete is used, parse_mesh will free its own memory on failure
+	if (success < 0) { free_memory(); return success; }
 #ifndef NDEBUG
 	std::cout << "Parse mesh succeeded" << std::endl;
 	auto e_mesh = std::chrono::high_resolution_clock::now();
 #endif
 
+
+#if MP_SCOPE != MP_SCOPE_MALLOC
 	bvh_node *root = reinterpret_cast<bvh_node*>(memory_pool.alloc(sizeof(bvh_node), alignof(bvh_node)));
 	if (root == nullptr) return -ERR_BUILD_BAD_ALLOC;
+#else
+	bvh_node *root = new bvh_node{};
+#endif
 	root->tris = tris; root->tris_len = tris_len; root->max = max; root->min = min;
 	std::atomic<uint32_t> nodes_len = 0;
+
 
 #ifndef NDEBUG
 	auto s_bvh = std::chrono::high_resolution_clock::now();
 #endif
 
+
 	success = build_bvh_node(root, verts, &nodes_len);
-	if (success < 0) { memory_pool.free(); return success; }
+	if (success < 0) {
+#if MP_SCOPE == MP_SCOPE_MALLOC
+		free_memory(root, verts, tris); delete root; 
+#else
+		free_memory();
+#endif
+		return success;
+	}
+
 
 #ifndef NDEBUG
 	std::cout << "Build bvh succeeded" << std::endl;
 	auto e_bvh = std::chrono::high_resolution_clock::now();
 #endif
 
-	char *ptr = output_buffer;
 
-	memcpy(ptr += tris_len * sizeof(vec<3, uint32_t>), tris, tris_len * sizeof(vec<3, uint32_t>));
-	memcpy(ptr, &nodes_len, sizeof(nodes_len));
+
+	uint32_t size_out = tris_len * sizeof(vec<3, uint32_t>) + sizeof(nodes_len) + nodes_len * sizeof(bvh_node_serialised);
+
+	char *output_buffer = static_cast<char*>(mmap(0, size_out, PROT_WRITE, MAP_PRIVATE, out_file_fd, 0));
+	if (output_buffer == MAP_FAILED) return -ERR_OUT_MAP;
+	
+	if (ftruncate(out_file_fd, size_out) < 0) { return -ERR_OUT_MAP; }
+
+	memcpy(output_buffer, tris, tris_len * sizeof(vec<3, uint32_t>));
+	memcpy(output_buffer + tris_len * sizeof(vec<3, uint32_t>), &nodes_len, sizeof(nodes_len));
+
 
 #ifndef NDEBUG
 	auto s_out = std::chrono::high_resolution_clock::now();
 #endif
 
+
 	std::atomic<uint32_t> curr_bvh_pos = 0;
-	success = output_bvh_node(root, tris, ptr + sizeof(nodes_len), &curr_bvh_pos, 0);
-	if (success < 0) { memory_pool.free(); return success; }
+	success = output_bvh_node(root, tris, output_buffer + tris_len * sizeof(vec<3, uint32_t>) + sizeof(nodes_len), &curr_bvh_pos, 0);
+	if (success < 0) {
+		munmap(output_buffer, size_out);
+#if MP_SCOPE == MP_SCOPE_MALLOC
+		free_memory(root, verts, tris); delete root;
+#else
+		free_memory();
+#endif
+		return success;
+	}
+
 
 #ifndef NDEBUG
 	std::cout << "Output bvh succeeded" << std::endl;
 	auto e_out = std::chrono::high_resolution_clock::now();
 #endif
 
-	*size_out = tris_len * sizeof(vec<3, uint32_t>) + sizeof(nodes_len) + nodes_len * sizeof(bvh_node_serialised);
-
-	memory_pool.free();
-
-#if MP_SCOPE == 0
-	std::atomic<bool> flag = false;
-	free_args args{ &flag };
-	auto task = tp_task<wrapper>(WRAPPER_TYPE_FREE, &args);
-	for (uint32_t i = 0; i < NUM_THREADS; i++) {
-		worker_pool.submit(&task);
-	}
-	flag.store(true, std::memory_order_relaxed);
-	flag.notify_all();
+#if MP_SCOPE == MP_SCOPE_MALLOC
+	free_memory(root, verts, tris);
+	delete root;
+#else
+	free_memory();
 #endif
+	munmap(output_buffer, size_out);
 
 #ifndef NDEBUG
 	auto e = std::chrono::high_resolution_clock::now();
