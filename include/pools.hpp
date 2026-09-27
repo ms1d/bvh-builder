@@ -5,6 +5,7 @@
 #include "structs.hpp"
 #include "build_bvh.hpp"
 #include "parse_mesh.hpp"
+#include <memory>
 
 
 #define WRAPPER_TYPE_BUILD 0
@@ -97,7 +98,8 @@ inline int wrapper(int type, void *data) {
 #if MP_SCOPE == 0
 		case WRAPPER_TYPE_FREE: {
 			auto args = static_cast<free_args*>(data);
-			args->flag->wait(false, std::memory_order_relaxed);
+			//args->flag->wait(false, std::memory_order_relaxed);
+			while (!args->flag->load(std::memory_order_relaxed));
 			memory_pool.free();
 			return 0;
 			break;
