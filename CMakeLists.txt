@@ -47,6 +47,12 @@ add_executable(bvh-builder ${CLIENT_SRC})
 file(GLOB DAEMON_SRC src/daemon/*.cpp)
 add_executable(bvh-builderd ${DAEMON_SRC})
 
+file(GLOB ONESHOT_SRC src/one-shot-client/*.cpp src/daemon/build_bvh.cpp src/daemon/parse_mesh.cpp)
+add_executable(bvh-builder-oneshot ${ONESHOT_SRC})
+
 target_link_libraries(bvh-builderd PRIVATE veclib thread-poollib memory-poollib)
 target_include_directories(bvh-builderd PRIVATE include)
 target_include_directories(bvh-builder PRIVATE include)
+
+target_link_libraries(bvh-builder-oneshot PRIVATE veclib thread-poollib memory-poollib)
+target_include_directories(bvh-builder-oneshot PRIVATE include)
