@@ -1,8 +1,8 @@
 #pragma once
 
-#define ERR_READ			1u
-#define ERR_INVALID_SIZEIN	2u
-#define ERR_INVALID_SIZEOUT 3u
+#define ERR_READ			 1
+#define ERR_INVALID_SIZEIN	 2
+#define ERR_INVALID_SIZEOUT  3
 #define ERR_IN_OPEN			 4
 #define ERR_OUT_OPEN		 5
 #define ERR_IN_TOO_LONG      6

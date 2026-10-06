@@ -5,7 +5,6 @@
 #include "structs.hpp"
 #include "build_bvh.hpp"
 #include "parse_mesh.hpp"
-#include <memory>
 
 
 #define WRAPPER_TYPE_BUILD 0

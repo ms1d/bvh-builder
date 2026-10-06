@@ -20,7 +20,7 @@ std::filesystem::path path = std::filesystem::current_path();
 
 
 
-inline int send_code(int client_fd, uint32_t code, const char *perror_name = nullptr) {
+inline int send_code(int client_fd, int code, const char *perror_name = nullptr) {
 #ifndef NDEBUG
 	if (perror_name != nullptr) perror(perror_name);
 #endif
@@ -90,7 +90,7 @@ int main(void) {
 
 		uint32_t in_file_path_len, out_file_path_len;
 		auto send_err_read = [client_fd]() {
-			send_code(client_fd, ERR_READ, "read");
+			send_code(client_fd, -ERR_READ, "read");
 			close(client_fd);
 		};
 
@@ -103,8 +103,8 @@ int main(void) {
 		printf("server: client data recieved\n");
 #endif
 
-		if (in_file_path_len >= BUFFER_SIZE) { send_code(client_fd, ERR_INVALID_SIZEIN); close(client_fd); continue; };
-		if (out_file_path_len >= BUFFER_SIZE) { send_code(client_fd, ERR_INVALID_SIZEOUT); close(client_fd); continue; };
+		if (in_file_path_len >= BUFFER_SIZE) { send_code(client_fd, -ERR_INVALID_SIZEIN); close(client_fd); continue; };
+		if (out_file_path_len >= BUFFER_SIZE) { send_code(client_fd, -ERR_INVALID_SIZEOUT); close(client_fd); continue; };
 
 #ifndef NDEBUG
 		printf("server: client in and out file_path_lens correct\n");
@@ -112,14 +112,14 @@ int main(void) {
 
 		int in_file_fd = open(in_file_path, O_RDONLY);
 		if (in_file_fd < 0) {
-			send_code(client_fd, ERR_IN_OPEN, "open");
+			send_code(client_fd, -ERR_IN_OPEN, "open");
 			close(client_fd);
 			continue;
 		}
 		int out_file_fd = open(out_file_path, O_CREAT | O_EXCL | O_RDWR, 0644);
 		if (out_file_fd < 0) {
 			close(in_file_fd);
-			send_code(client_fd, ERR_OUT_OPEN, "open");
+			send_code(client_fd, -ERR_OUT_OPEN, "open");
 			close(client_fd);
 			continue;
 		}
@@ -129,7 +129,7 @@ int main(void) {
 		unsigned long in_file_size = static_cast<unsigned long>(in_s.st_size);
 		if (in_file_size != static_cast<uint32_t>(in_file_size)) {
 			close(in_file_fd); close(out_file_fd);
-			send_code(client_fd, ERR_IN_TOO_LONG);
+			send_code(client_fd, -ERR_IN_TOO_LONG);
 			close(client_fd);
 			continue;
 		}
@@ -137,7 +137,7 @@ int main(void) {
 		char *input_buffer = static_cast<char*>(mmap(0, in_file_size, PROT_READ, MAP_SHARED, in_file_fd, 0));
 		if (input_buffer == MAP_FAILED) {
 			close(in_file_fd); close(out_file_fd);
-			send_code(client_fd, ERR_IN_MAP, "mmap");
+			send_code(client_fd, -ERR_IN_MAP, "mmap");
 			close(client_fd);
 			continue;
 		}
@@ -145,7 +145,7 @@ int main(void) {
 		int bvh_res = build_bvh(input_buffer, static_cast<uint32_t>(in_file_size), out_file_fd);
 		if (bvh_res < 0) {
 			close(in_file_fd); close(out_file_fd);
-			send_code(client_fd, static_cast<uint32_t>(-bvh_res));
+			send_code(client_fd, bvh_res);
 			close(client_fd);
 			continue;
 		}
