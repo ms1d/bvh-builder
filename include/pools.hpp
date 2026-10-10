@@ -1,7 +1,7 @@
 #pragma once
 
 #include "thread_pool.hpp"
-#include "bump_pool.hpp"
+#include "arena_pool.hpp"
 #include "structs.hpp"
 #include "build_bvh.hpp"
 #include "parse_mesh.hpp"
