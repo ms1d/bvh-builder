@@ -23,7 +23,7 @@ endforeach()
 FetchContent_Declare(
 	memory-poollib
 	GIT_REPOSITORY https://github.com/ms1d/memory-poollib
-	GIT_TAG v0.1.0
+	GIT_TAG v0.1.1
 )
 
 FetchContent_MakeAvailable(${MY_DEPS} memory-poollib)
