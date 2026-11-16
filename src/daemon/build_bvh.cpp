@@ -296,7 +296,7 @@ void free_memory(bvh_node *node = nullptr, vec<3> *verts = nullptr, vec<3, uint3
 	if (verts) delete[] verts;
 	if (tris) delete[] tris;
 
-	if (!node->children) return;
+	if (!node || !node->children) return;
 
 	for (uint32_t i = 0; i < CHILDREN_PER_NODE; i++) {
 		free_memory(node->children + i);
