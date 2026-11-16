@@ -199,7 +199,7 @@ int output_bvh_node(bvh_node *curr_node, vec<3, uint32_t> *root_tris, char *bvh_
 	curr_node_out.min.z = _cvtss_sh(curr_node->min.z, 0);
 
 	if (curr_node->tris != nullptr) { // LSB = is_leaf = 1
-		auto index = static_cast<uint32_t>(curr_node->tris_len);
+		auto index = static_cast<uint32_t>(curr_node->tris - root_tris);
 	    ui32_FITS(index, 31);
 		curr_node_out.payload = (index << 1) + 1;
 	}
