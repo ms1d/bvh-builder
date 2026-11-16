@@ -190,13 +190,13 @@ int output_bvh_node(bvh_node *curr_node, vec<3, uint32_t> *root_tris, char *bvh_
 	bvh_node_serialised curr_node_out;
 
 	// Convert to half float
-	curr_node_out.max.x = _cvtss_sh(curr_node->max.x, 0);
-	curr_node_out.max.y = _cvtss_sh(curr_node->max.y, 0);
-	curr_node_out.max.z = _cvtss_sh(curr_node->max.z, 0);
+	curr_node_out.max.x = _cvtss_sh(curr_node->max.x, _MM_FROUND_TO_POS_INF | _MM_FROUND_NO_EXC);
+	curr_node_out.max.y = _cvtss_sh(curr_node->max.y, _MM_FROUND_TO_POS_INF | _MM_FROUND_NO_EXC);
+	curr_node_out.max.z = _cvtss_sh(curr_node->max.z, _MM_FROUND_TO_POS_INF | _MM_FROUND_NO_EXC);
 
-	curr_node_out.min.x = _cvtss_sh(curr_node->min.x, 0);
-	curr_node_out.min.y = _cvtss_sh(curr_node->min.y, 0);
-	curr_node_out.min.z = _cvtss_sh(curr_node->min.z, 0);
+	curr_node_out.min.x = _cvtss_sh(curr_node->min.x, _MM_FROUND_TO_NEG_INF | _MM_FROUND_NO_EXC);
+	curr_node_out.min.y = _cvtss_sh(curr_node->min.y, _MM_FROUND_TO_NEG_INF | _MM_FROUND_NO_EXC);
+	curr_node_out.min.z = _cvtss_sh(curr_node->min.z, _MM_FROUND_TO_NEG_INF | _MM_FROUND_NO_EXC);
 
 	if (curr_node->tris != nullptr) { // LSB = is_leaf = 1
 		auto index = static_cast<uint32_t>(curr_node->tris - root_tris);
