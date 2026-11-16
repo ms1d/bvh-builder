@@ -95,16 +95,17 @@ int main(void) {
 		};
 
 		if (read_bytes(client_fd, reinterpret_cast<char*>(&in_file_path_len), 4) < 0) { send_err_read(); continue; }
+		if (in_file_path_len >= BUFFER_SIZE) { send_code(client_fd, -ERR_INVALID_SIZEIN); close(client_fd); continue; };
 		if (read_bytes(client_fd, in_file_path, in_file_path_len) < 0) { send_err_read(); continue; }
+
 		if (read_bytes(client_fd, reinterpret_cast<char*>(&out_file_path_len), 4) < 0) { send_err_read(); continue; }
+		if (out_file_path_len >= BUFFER_SIZE) { send_code(client_fd, -ERR_INVALID_SIZEOUT); close(client_fd); continue; };
 		if (read_bytes(client_fd, out_file_path, out_file_path_len) < 0) { send_err_read(); continue; }
 
 #ifndef NDEBUG
 		printf("server: client data recieved\n");
 #endif
 
-		if (in_file_path_len >= BUFFER_SIZE) { send_code(client_fd, -ERR_INVALID_SIZEIN); close(client_fd); continue; };
-		if (out_file_path_len >= BUFFER_SIZE) { send_code(client_fd, -ERR_INVALID_SIZEOUT); close(client_fd); continue; };
 
 #ifndef NDEBUG
 		printf("server: client in and out file_path_lens correct\n");
