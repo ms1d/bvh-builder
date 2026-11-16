@@ -367,11 +367,10 @@ int build_bvh(const char *input_buffer, const uint32_t size_in, int out_file_fd)
 
 
 	uint32_t size_out = tris_len * sizeof(vec<3, uint32_t>) + sizeof(nodes_len) + nodes_len * sizeof(bvh_node_serialised);
-
-	char *output_buffer = static_cast<char*>(mmap(0, size_out, PROT_WRITE, MAP_PRIVATE, out_file_fd, 0));
-	if (output_buffer == MAP_FAILED) return -ERR_OUT_MAP;
-	
 	if (ftruncate(out_file_fd, size_out) < 0) { return -ERR_OUT_MAP; }
+
+	char *output_buffer = static_cast<char*>(mmap(0, size_out, PROT_WRITE, MAP_SHARED, out_file_fd, 0));
+	if (output_buffer == MAP_FAILED) return -ERR_OUT_MAP;
 
 	memcpy(output_buffer, tris, tris_len * sizeof(vec<3, uint32_t>));
 	memcpy(output_buffer + tris_len * sizeof(vec<3, uint32_t>), &nodes_len, sizeof(nodes_len));
