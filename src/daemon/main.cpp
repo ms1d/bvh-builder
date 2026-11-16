@@ -145,6 +145,7 @@ int main(void) {
 
 		int bvh_res = build_bvh(input_buffer, static_cast<uint32_t>(in_file_size), out_file_fd);
 		if (bvh_res < 0) {
+			munmap(input_buffer, in_file_size);
 			close(in_file_fd); close(out_file_fd);
 			send_code(client_fd, bvh_res);
 			close(client_fd);
@@ -157,6 +158,7 @@ int main(void) {
 		printf("server: bvh_res sent\n");
 #endif
 
+		munmap(input_buffer, in_file_size);
 		close(client_fd);
 		close(in_file_fd);
 		close(out_file_fd);
