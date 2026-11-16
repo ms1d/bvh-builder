@@ -14,11 +14,11 @@ int parse_mesh(const char *input_buffer, const uint32_t size, // number of BYTES
 
 	const char *__restrict ptr = input_buffer;
 
-	memcpy(&verts_len, ptr, sizeof(verts_len));
-
 	// Need at least 1 triangle (3 vertices)
 	// Need verts_len to not be too big (allow space for tris_len)
 	if (verts_len < 3 || sizeof(verts_len) + verts_len * sizeof(vec<3>) + sizeof(tris_len) >= size) return -ERR_PARSE_VERTS_LEN;
+
+	memcpy(&verts_len, ptr, sizeof(verts_len));
 
 #if MP_SCOPE != MP_SCOPE_MALLOC
 	verts = reinterpret_cast<vec<3>*>(memory_pool.alloc(verts_len * sizeof(vec<3>), alignof(vec<3>)));
