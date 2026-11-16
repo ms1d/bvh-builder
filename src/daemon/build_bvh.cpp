@@ -70,7 +70,7 @@ int build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint32_t> *nodes_l
 
 	// 2 - Create new children
 #if MP_SCOPE != MP_SCOPE_MALLOC
-	node->children = reinterpret_cast<bvh_node*>(memory_pool.alloc(CHILDREN_PER_NODE * sizeof(bvh_node), alignof(bvh_node)));
+	node->children = memory_pool.alloc_and_cast<bvh_node>(CHILDREN_PER_NODE);
 	if (node->children == nullptr) return -ERR_BUILD_BAD_ALLOC;
 #else
 	node->children = new bvh_node[CHILDREN_PER_NODE];
@@ -119,8 +119,8 @@ int build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint32_t> *nodes_l
 
 	// Due to stack re-use during recursion, it is not safe to stack allocate task
 #if MP_SCOPE != MP_SCOPE_MALLOC
-	auto tasks = reinterpret_cast<tp_task<wrapper>*>(memory_pool.alloc((CHILDREN_PER_NODE-1) * sizeof(tp_task<wrapper>), alignof(tp_task<wrapper>)));
-	auto args = reinterpret_cast<build_bvh_node_args*>(memory_pool.alloc((CHILDREN_PER_NODE-1) * sizeof(build_bvh_node_args), alignof(build_bvh_node_args)));
+	auto tasks = memory_pool.alloc_and_cast<tp_task<wrapper>>(CHILDREN_PER_NODE-1);
+	auto args = memory_pool.alloc_and_cast<build_bvh_node_args>(CHILDREN_PER_NODE-1);
 #else
 	auto tasks = new tp_task<wrapper>[CHILDREN_PER_NODE-1];
 	auto args = new build_bvh_node_args[CHILDREN_PER_NODE-1];
@@ -212,8 +212,8 @@ int output_bvh_node(bvh_node *curr_node, vec<3, uint32_t> *root_tris, char *bvh_
 
 		// Due to stack re-use during recursion, it is not safe to stack allocate tasks
 #if MP_SCOPE != MP_SCOPE_MALLOC
-		auto tasks = reinterpret_cast<tp_task<wrapper>*>(memory_pool.alloc((CHILDREN_PER_NODE-1) * sizeof(tp_task<wrapper>), alignof(tp_task<wrapper>)));
-		auto args = reinterpret_cast<output_bvh_node_args*>(memory_pool.alloc((CHILDREN_PER_NODE-1) * sizeof(output_bvh_node_args), alignof(output_bvh_node_args)));
+		auto tasks = memory_pool.alloc_and_cast<tp_task<wrapper>>(CHILDREN_PER_NODE-1);
+		auto args = memory_pool.alloc_and_cast<output_bvh_node_args>(CHILDREN_PER_NODE-1);
 #else
 		auto tasks = new tp_task<wrapper>[CHILDREN_PER_NODE-1];
 		auto args = new output_bvh_node_args[CHILDREN_PER_NODE-1];
