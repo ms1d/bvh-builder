@@ -57,7 +57,7 @@ inline int wrapper(int type, void *data);
 inline thread_pool<wrapper, NUM_THREADS, NUM_TASKS, pool_type::TP_TYPE> worker_pool{};
 
 #ifndef POOL_SIZE
-#define POOL_SIZE 200'000'000
+#define POOL_SIZE 20'000'000
 #endif
 
 #ifndef MP_TYPE
