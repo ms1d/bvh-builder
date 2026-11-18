@@ -70,7 +70,7 @@ int build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint32_t> *nodes_l
 
 	// 2 - Create new children
 #if MP_SCOPE != MP_SCOPE_MALLOC
-	node->children = memory_pool.alloc_and_cast<bvh_node>(CHILDREN_PER_NODE);
+	node->children = memory_pool.alloc_and_construct<bvh_node>(CHILDREN_PER_NODE);
 	if (node->children == nullptr) return -ERR_BUILD_BAD_ALLOC;
 #else
 	node->children = new bvh_node[CHILDREN_PER_NODE];
@@ -119,8 +119,8 @@ int build_bvh_node(bvh_node *node, vec<3> *verts, std::atomic<uint32_t> *nodes_l
 
 	// Due to stack re-use during recursion, it is not safe to stack allocate task
 #if MP_SCOPE != MP_SCOPE_MALLOC
-	auto tasks = memory_pool.alloc_and_cast<tp_task<wrapper>>(CHILDREN_PER_NODE-1);
-	auto args = memory_pool.alloc_and_cast<build_bvh_node_args>(CHILDREN_PER_NODE-1);
+	auto tasks = memory_pool.alloc_and_construct<tp_task<wrapper>>(CHILDREN_PER_NODE-1);
+	auto args = memory_pool.alloc_and_construct<build_bvh_node_args>(CHILDREN_PER_NODE-1);
 #else
 	auto tasks = new tp_task<wrapper>[CHILDREN_PER_NODE-1];
 	auto args = new build_bvh_node_args[CHILDREN_PER_NODE-1];
@@ -212,8 +212,8 @@ int output_bvh_node(bvh_node *curr_node, vec<3, uint32_t> *root_tris, char *bvh_
 
 		// Due to stack re-use during recursion, it is not safe to stack allocate tasks
 #if MP_SCOPE != MP_SCOPE_MALLOC
-		auto tasks = memory_pool.alloc_and_cast<tp_task<wrapper>>(CHILDREN_PER_NODE-1);
-		auto args = memory_pool.alloc_and_cast<output_bvh_node_args>(CHILDREN_PER_NODE-1);
+		auto tasks = memory_pool.alloc_and_construct<tp_task<wrapper>>(CHILDREN_PER_NODE-1);
+		auto args = memory_pool.alloc_and_construct<output_bvh_node_args>(CHILDREN_PER_NODE-1);
 #else
 		auto tasks = new tp_task<wrapper>[CHILDREN_PER_NODE-1];
 		auto args = new output_bvh_node_args[CHILDREN_PER_NODE-1];
@@ -287,7 +287,7 @@ void free_memory(bvh_node *node = nullptr, vec<3> *verts = nullptr, vec<3, uint3
 		worker_pool.submit(tasks + i);
 	}
 
-	memory_pool.free();
+	memory_pool.free<true>();
 
 	for (uint32_t i = 0; i < NUM_THREADS; i++) {
 		tasks[i].is_result_ready.wait(false, std::memory_order_relaxed);
