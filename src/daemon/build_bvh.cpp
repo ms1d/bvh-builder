@@ -287,7 +287,7 @@ void free_memory(bvh_node *node = nullptr, vec<3> *verts = nullptr, vec<3, uint3
 		worker_pool.submit(tasks + i);
 	}
 
-	memory_pool.free<true>();
+	memory_pool.free();
 
 	for (uint32_t i = 0; i < NUM_THREADS; i++) {
 		tasks[i].is_result_ready.wait(false, std::memory_order_relaxed);
